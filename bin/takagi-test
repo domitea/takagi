@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/takagi"
+
+class TestApp < Takagi::Base
+  get "/ping" do |_params|
+    { message: "Pong!" }
+  end
+
+  post "/echo" do |params|
+    { received: params }
+  end
+
+  get "/users/:id" do |params|
+    { received: params }
+  end
+end
+
+puts "Starting Takagi test server..."
+TestApp.run!
