@@ -18,8 +18,6 @@ module Takagi
       match_dynamic_route(method, path)
     end
 
-    private
-
     def self.match_dynamic_route(method, path)
       @@routes.each do |route_key, block|
         route_method, route_path = route_key.split(" ", 2)
@@ -32,7 +30,7 @@ module Takagi
         params = {}
         match = route_parts.each_with_index.all? do |part, index|
           if part.start_with?(":")
-            param_name = part[1..-1]
+            param_name = part[1..]
             params[param_name.to_sym] = path_parts[index]
             true
           else

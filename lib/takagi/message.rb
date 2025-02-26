@@ -5,12 +5,12 @@ module Takagi
     def self.parse(data)
       version_type_tkl = data.bytes[0]
       code = data.bytes[1]
-      message_id = data.bytes[2..3].pack("C*").unpack("n").first
+      data.bytes[2..3].pack("C*").unpack1("n")
       token_length = version_type_tkl & 0x0F
       token = data[4, token_length] || "".b
       path = extract_uri_path(data.bytes[(4 + token_length)..])
       payload_start = data.index("\xFF".b)
-      payload = payload_start ? data[(payload_start + 1)..-1].force_encoding("ASCII-8BIT") : nil
+      payload = payload_start ? data[(payload_start + 1)..].force_encoding("ASCII-8BIT") : nil
 
       { method: coap_code_to_method(code), path: path, token: token, payload: payload }
     end
@@ -24,8 +24,6 @@ module Takagi
       payload_data = payload.to_json.force_encoding("ASCII-8BIT")
       header + token + payload_marker + payload_data
     end
-
-    private
 
     def self.coap_code_to_method(code)
       case code
@@ -70,7 +68,7 @@ module Takagi
       path = "/#{path_segments.join("/")}"
 
       path.force_encoding("UTF-8") if path.valid_encoding?
-      puts "Final parsed path: #{path}"  # Debug výpis celé cesty
+      puts "Final parsed path: #{path}" # Debug výpis celé cesty
       path
     end
   end

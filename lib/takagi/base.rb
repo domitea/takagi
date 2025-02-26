@@ -5,9 +5,9 @@ require "sequel"
 require "socket"
 require "json"
 
-require_relative 'router'
-require_relative 'message'
-require_relative 'server'
+require_relative "router"
+require_relative "message"
+require_relative "server"
 
 module Takagi
   class Base < Takagi::Router

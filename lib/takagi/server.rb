@@ -4,7 +4,7 @@ module Takagi
   class Server
     def self.run!(port: 5683)
       server = UDPSocket.new
-      server.bind('0.0.0.0', port)
+      server.bind("0.0.0.0", port)
       puts "Takagi running on CoAP://0.0.0.0:#{port}"
 
       loop do
