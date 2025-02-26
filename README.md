@@ -12,6 +12,11 @@ It provides a lightweight way to build **CoAP APIs**, handle **IoT messaging**, 
 🔹 **Efficient and fast** – Runs over UDP, ideal for IoT applications.  
 🔹 **Database-ready** – Seamless integration with **Sequel** for storing device data.
 
+## Why "Takagi"?
+The name **Takagi** is inspired by **Riyoko Takagi**, as a nod to the naming convention of Sinatra.
+Just like Sinatra simplified web applications in Ruby, Takagi aims to simplify CoAP-based IoT communication in Ruby. It embodies minimalism, efficiency, and a straightforward approach to handling CoAP requests.
+Additionally, both Sinatra and Takagi share a connection to **jazz music**, as Riyoko Takagi is a known jazz pianist, much like how Sinatra was named after the legendary Frank Sinatra.
+
 ---
 
 ## Installation
