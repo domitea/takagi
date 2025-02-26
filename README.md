@@ -3,7 +3,7 @@
 <!---
 [![Gem Version](https://badge.fury.io/rb/takagi.svg)](https://rubygems.org/gems/takagi)
 -->
-[![Build Status](https://github.com/domitea/takagi/actions/workflows/tests.yml/badge.svg)](https://github.com/domitea/takagi/actions)
+[![Build Status](https://github.com/domitea/takagi/actions/workflows/main.yml/badge.svg)](https://github.com/domitea/takagi/actions)
 
 ## About Takagi
 
