@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-require_relative '../../lib/takagi/router'
+
+require_relative "../../lib/takagi/router"
 
 RSpec.describe Takagi::Router do
   before do

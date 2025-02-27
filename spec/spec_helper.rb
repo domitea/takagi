@@ -12,4 +12,6 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  Dir["#{File.dirname(__FILE__)}/**/*.rb"].each { |file| require file }
 end
