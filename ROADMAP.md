@@ -27,7 +27,7 @@
 - [ ] **Device Authentication** → Basic token-based security.
 - [ ] **Notify clients about state changes trough Observer**
 - [ ] **Define a standardized API for devices.**
-- [ ] **Integrate with a database (Sequel, InfluxDB?).**
+- [ ] **Integrate with more databases (InfluxDB?).**
 - [ ] **Scalability & performance testing.**
 
 ---
