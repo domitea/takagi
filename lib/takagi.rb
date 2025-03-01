@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
-require_relative "takagi/version"
-require_relative "takagi/base"
+require 'zeitwerk'
 
 module Takagi
   class Error < StandardError; end
-  # Your code goes here...
+
+  loader = Zeitwerk::Loader.for_gem
+  loader.setup
+  loader.eager_load
 end

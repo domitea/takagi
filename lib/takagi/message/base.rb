@@ -2,7 +2,7 @@
 
 module Takagi
   module Message
-    class BaseMessage
+    class Base
       attr_reader :version, :type, :token, :message_id, :payload, :options, :code
 
       COAP_CODES = {
@@ -35,11 +35,11 @@ module Takagi
         parse(data) if data
       end
 
-      def self.coap_code_to_method(code)
+      def coap_code_to_method(code)
         COAP_CODES[code] || "UNKNOWN"
       end
 
-      def self.coap_method_to_code(method)
+      def coap_method_to_code(method)
         COAP_CODES.key(method) || 0
       end
 

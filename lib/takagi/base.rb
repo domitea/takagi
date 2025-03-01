@@ -5,14 +5,10 @@ require "sequel"
 require "socket"
 require "json"
 
-require_relative "router"
-require_relative "message"
-require_relative "server"
-
 module Takagi
   class Base < Takagi::Router
     def self.run!(port: 5683)
-      Takagi::Server.run!(port: port)
+      Takagi::Server.new(port: port).run!
     end
   end
 end

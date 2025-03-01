@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Takagi
-  class Message
+  class MessageOld
     def self.parse(data)
       version_type_tkl = data.bytes[0]
       code = data.bytes[1]

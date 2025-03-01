@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "logger"
+require 'yaml'
 
 module Takagi
   class Server
@@ -8,7 +8,7 @@ module Takagi
       @port = port
       @socket = UDPSocket.new
       @socket.bind("0.0.0.0", @port)
-      @middlewares = MiddlewareStack.load_from_config(config_file)
+      @middlewares = Takagi::MiddlewareStack.load_from_config(config_file)
       Initializer.run!
     end
 
@@ -18,7 +18,7 @@ module Takagi
       loop do
         data, addr = @socket.recvfrom(1024)
         Ractor.new(data, addr, @middlewares) do |data, addr, middlewares|
-          request = IncomingMessage.new(data)
+          request = Message::Inbound.new(data)
           response = middlewares.call(request)
           @socket.send(response.to_bytes, 0, addr[3], addr[1])
         end

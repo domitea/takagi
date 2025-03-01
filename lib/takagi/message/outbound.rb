@@ -2,7 +2,7 @@
 
 module Takagi
   module Message
-    class OutboundMessage < BaseMessage
+    class Outbound < Base
       def initialize(code, payload, token = nil, message_id = nil)
         @code = self.class.coap_method_to_code(code)
         @payload = payload.to_json.force_encoding("ASCII-8BIT")

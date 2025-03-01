@@ -2,18 +2,18 @@
 
 module Takagi
   module Message
-    class InboundMessage < BaseMessage
+    class Inbound < Base
       attr_reader :method, :uri, :response_code
 
       def initialize(data)
         super
-        @method = self.class.coap_code_to_method(@code)
-        @response_code = self.class.coap_code_to_method(@code) if @code >= 65 # Response
+        @method = coap_code_to_method(@code)
+        @response_code = coap_code_to_method(@code) if @code >= 65 # Response
         @uri = parse_uri(@options)
       end
 
       def to_response(code, payload)
-        OutboundMessage.new(code, payload, @token, @message_id)
+        Outbound.new(code, payload, @token, @message_id)
       end
 
       private

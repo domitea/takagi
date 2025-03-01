@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # D = Steep::Diagnostic
 #
 # target :lib do
@@ -35,4 +37,3 @@ target :takagi do
   check "lib"
   signature "sig"
 end
-
