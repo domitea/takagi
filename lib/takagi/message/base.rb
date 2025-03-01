@@ -31,6 +31,12 @@ module Takagi
         163 => "5.03 Service Unavailable"
       }.freeze
 
+      COAP_CODES_NUMBERS = {
+        "2.05" => 69,  # Content
+        "4.04" => 132, # Not Found
+        "5.00" => 160  # Internal Server Error
+      }
+
       def initialize(data = nil)
         parse(data) if data
       end
@@ -76,7 +82,7 @@ module Takagi
       end
 
       def extract_payload(data)
-        payload_start = data.index("\xFF")
+        payload_start = data.index("\xFF".b)
         return nil unless payload_start
 
         payload = data[(payload_start + 1)..].force_encoding("ASCII-8BIT")

@@ -9,19 +9,11 @@ module Takagi
         super
         @method = coap_code_to_method(@code)
         @response_code = coap_code_to_method(@code) if @code >= 65 # Response
-        @uri = parse_uri(@options)
+        @uri = URI.parse("coap://#{@options[3]}/#{@options[11]}")
       end
 
       def to_response(code, payload)
         Outbound.new(code, payload, @token, @message_id)
-      end
-
-      private
-
-      def parse_uri(options)
-        path_segments = options[11] ? options[11].split("/") : []
-        path = "/#{path_segments.join("/")}"
-        URI::Generic.build(path: path)
       end
     end
   end

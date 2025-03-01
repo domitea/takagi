@@ -2,24 +2,34 @@
 
 module Takagi
   class Router
-    @@routes = {}
-
-    def self.get(path, &block)
-      @@routes["GET #{path}"] = block
+    def initialize
+      @routes = {}
     end
 
-    def self.post(path, &block)
-      @@routes["POST #{path}"] = block
+    def get(path, &block)
+      @routes["GET #{path}"] = block
     end
 
-    def self.find_route(method, path)
-      return @@routes["#{method} #{path}"], {} if @@routes.key?("#{method} #{path}")
-
-      match_dynamic_route(method, path)
+    def post(path, &block)
+      @routes["POST #{path}"] = block
     end
 
-    def self.match_dynamic_route(method, path)
-      @@routes.each do |route_key, block|
+    def find_route(method, path)
+      block = @routes["#{method} #{path}"]
+      params = {}
+
+      return block.call(params) if block
+
+      block, params = match_dynamic_route(method, path)
+      return block.call(params) if block
+
+      Takagi::Message::Outbound.new(code: "4.04 Not Found", payload: {})
+    end
+
+    private
+
+    def match_dynamic_route(method, path)
+      @routes.each do |route_key, block|
         route_method, route_path = route_key.split(" ", 2)
         next unless route_method == method
 
@@ -41,7 +51,7 @@ module Takagi
         return [block, params] if match
       end
 
-      [nil, {}]
+      nil
     end
   end
 end
