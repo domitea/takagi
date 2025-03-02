@@ -10,12 +10,14 @@ module Takagi
       @worker_threads = worker_threads
       @middleware_stack = Takagi::MiddlewareStack.instance
       @router = Takagi::Router.instance
-      Initializer.run!
+
+      Initializer.run! # Load any initialization logic
 
       @socket = UDPSocket.new
       @socket.bind('0.0.0.0', @port)
     end
 
+    # Starts the server with multiple worker processes
     def run!
       puts "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
       puts "run #{@router.all_routes}"
@@ -30,6 +32,7 @@ module Takagi
       Process.waitall
     end
 
+    # Gracefully shuts down all workers
     def shutdown!
       puts "[Server] Shutting down all workers..."
 
@@ -37,7 +40,7 @@ module Takagi
         @workers.each { |worker| worker.exit if worker.alive? }
       end
 
-      Process.kill("TERM", 0)
+      Process.kill("TERM", 0) # Sends SIGTERM to all worker processes
       puts "[Server] Shutdown complete."
       exit(0)
     end
@@ -45,6 +48,8 @@ module Takagi
 
     private
 
+    # Starts a worker process that listens for incoming requests
+    # @param socket [UDPSocket] The shared UDP socket
     def start_worker_process(socket)
       queue = Queue.new
       @workers = Array.new(@worker_threads) { start_thread_worker(queue, socket) }
@@ -62,6 +67,9 @@ module Takagi
       exit(0)
     end
 
+    # Starts a thread worker that processes requests from the queue
+    # @param queue [Queue] Shared request queue
+    # @param socket [UDPSocket] UDP socket for response sending
     def start_thread_worker(queue, socket)
       Thread.new do
         loop do
@@ -71,6 +79,10 @@ module Takagi
       end
     end
 
+    # Handles an incoming request by passing it through the middleware stack
+    # @param request [String] Raw request data
+    # @param addr [Array] Address details of the sender
+    # @param socket [UDPSocket] UDP socket for sending responses
     def handle_request(request, addr, socket)
       inbound_request = Takagi::Message::Inbound.new(request)
       json_response = @middleware_stack.call(inbound_request)

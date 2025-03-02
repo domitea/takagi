@@ -2,6 +2,7 @@
 
 module Takagi
   class Initializer
+    # Runs the initialization logic (e.g., loading configurations, setting up databases)
     def self.run!
       load_initializers
     end

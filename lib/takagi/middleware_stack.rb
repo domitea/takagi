@@ -13,10 +13,15 @@ module Takagi
       use(Takagi::Middleware::Debugging.new)
     end
 
+    # Adds a new middleware to the stack
+    # @param middleware [Object] Middleware instance that responds to `call`
     def use(middleware)
       @middlewares << middleware
     end
 
+    # Processes the request through the middleware stack and routes it
+    # @param request [Takagi::Message::Inbound] Incoming request object
+    # @return [Takagi::Message::Outbound] The final processed response
     def call(request)
       app = ->(req) { @router.find_route(req.method.to_s, req.uri.path) || req.to_response("4.04 Not Found", { error: "not found" }) }
 
@@ -27,6 +32,7 @@ module Takagi
 
     private
 
+    # Loads middleware stack from a configuration file
     def load_config
       config_file = "config/middleware.yml"
       return unless File.exist?(config_file)

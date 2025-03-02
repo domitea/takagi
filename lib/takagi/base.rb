@@ -15,10 +15,16 @@ module Takagi
       @router ||= Takagi::Router.instance
     end
 
+    # Registers a GET route in the global router
+    # @param path [String] The URL path
+    # @param block [Proc] The request handler
     def self.get(path, &block)
       router.get(path, &block)
     end
 
+    # Registers a POST route in the global router
+    # @param path [String] The URL path
+    # @param block [Proc] The request handler
     def self.post(path, &block)
       router.post(path, &block)
     end
