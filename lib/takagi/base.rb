@@ -12,7 +12,7 @@ module Takagi
     end
 
     def self.router
-      @router ||= Takagi::Router.new
+      @router ||= Takagi::Router.instance
     end
 
     def self.get(path, &block)
@@ -28,7 +28,7 @@ module Takagi
     end
 
     def self.middleware_stack
-      @middleware_stack ||= Takagi::MiddlewareStack.new(router)
+      @middleware_stack ||= Takagi::MiddlewareStack.load_from_config("", router)
     end
 
     def self.use(middleware)

@@ -11,20 +11,18 @@ module Takagi
       end
 
       def to_bytes
-        return "".b unless @code && @payload # Nikdy nesmí vrátit nil!
+        return "".b unless @code && @payload
 
         begin
           puts "[Debug] Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, message_id #{@message_id}, token #{@token.inspect}"
 
-          version_type_token_length = 0x60 # Verze 1 (bity 0110), Typ zprávy: Confirmable (00)
+          version_type_token_length = 0x60
           header = [version_type_token_length, @code, @message_id, @token.bytesize].pack("CCnC")
 
           token_payload = @token.to_s.b
 
-          # Přidáme `\xFF` (oddělovač payloadu) pouze pokud payload není prázdný
           payload_part = @payload.to_s.empty? ? "".b : "\xFF".b + @payload.to_s.b
 
-          # Finální paket
           packet = (header + token_payload + payload_part).b
 
           puts "[Debug] Final CoAP packet: #{packet.inspect}"
@@ -32,7 +30,7 @@ module Takagi
           packet
         rescue StandardError => e
           puts "[Error] to_bytes failed: #{e.message} at #{e.backtrace.first}"
-          "".b # Fail-safe: pokud něco selže, vrátíme prázdný string
+          "".b
         end
       end
 

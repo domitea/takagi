@@ -39,6 +39,7 @@ module Takagi
 
       def initialize(data = nil)
         parse(data) if data
+        @data = data
       end
 
       def coap_code_to_method(code)
@@ -63,22 +64,31 @@ module Takagi
       end
 
       def parse_options(bytes)
-        options = {}
-        index = 0
+        Thread.current[:options] = {}
+
+        options_start = 0
         last_option = 0
 
-        while index < bytes.length && bytes[index] != 255 # 0xFF = payload marker
-          delta = (bytes[index] >> 4) & 0b1111
-          length = bytes[index] & 0b1111
-          index += 1
+        while options_start < bytes.length && bytes[options_start] != 255 # 0xFF = start of payload
+          delta = (bytes[options_start] >> 4) & 0x0F  # Číslo opce
+          len = bytes[options_start] & 0x0F           # Délka dat
+          options_start += 1
 
-          last_option += delta
-          option_value = bytes[index, length].pack("C*")
-          options[last_option] = option_value
-          index += length
+          option_number = last_option + delta
+          option_value = bytes[options_start, len].pack("C*").b
+
+          if option_number == 11
+            Thread.current[:options][11] ||= []
+            Thread.current[:options][11] << option_value.force_encoding("UTF-8")
+          else
+            Thread.current[:options][option_number] = option_value.force_encoding("UTF-8")
+          end
+
+          options_start += len
+          last_option = option_number
         end
 
-        options
+        puts "[Debug] Parsed CoAP options: #{Thread.current[:options].inspect}"
       end
 
       def extract_payload(data)

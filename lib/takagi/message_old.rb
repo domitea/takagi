@@ -44,31 +44,30 @@ module Takagi
     end
 
     def self.extract_uri_path(bytes)
-      path_segments = [] # Místo prostého stringu uložíme segmenty do pole
+      path_segments = []
       options_start = 0
       last_option = 0
 
-      while options_start < bytes.length && bytes[options_start] != 255 # 0xFF = start payloadu
-        delta = (bytes[options_start] >> 4) & 0x0F  # Číslo opce
-        len = bytes[options_start] & 0x0F           # Délka dat
+      while options_start < bytes.length && bytes[options_start] != 255
+        delta = (bytes[options_start] >> 4) & 0x0F
+        len = bytes[options_start] & 0x0F
         options_start += 1
 
         option_number = last_option + delta
-        if option_number == 11 # Uri-Path (11 znamená část cesty)
+        if option_number == 11
           segment = bytes[options_start, len].pack("C*").b
-          path_segments << segment # Ukládáme jednotlivé segmenty do pole
-          puts "Parsed path segment: #{segment}" # Debug výpis
+          path_segments << segment
+          puts "Parsed path segment: #{segment}"
         end
 
         options_start += len
         last_option = option_number
       end
 
-      # Spojíme segmenty pomocí `/` a zajistíme, že začne `/`
       path = "/#{path_segments.join("/")}"
 
       path.force_encoding("UTF-8") if path.valid_encoding?
-      puts "Final parsed path: #{path}" # Debug výpis celé cesty
+      puts "Final parsed path: #{path}"
       path
     end
   end

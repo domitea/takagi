@@ -4,11 +4,12 @@ require 'yaml'
 
 module Takagi
   class Server
-    def initialize(port: 5683, worker_processes: 2, worker_threads: 10)
+    def initialize(port: 5683, worker_processes: 2, worker_threads: 5)
       @port = port
       @worker_processes = worker_processes
       @worker_threads = worker_threads
-      @middleware_stack = Takagi::MiddlewareStack.load_from_config("")
+      @middleware_stack = Takagi::MiddlewareStack.instance
+      @router = Takagi::Router.instance
       Initializer.run!
 
       @socket = UDPSocket.new
@@ -17,8 +18,9 @@ module Takagi
 
     def run!
       puts "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
-
+      puts "run #{@router.all_routes}"
       @worker_processes.times do
+        puts "process with #{@router.all_routes}"
         fork do
           start_worker_process(@socket)
         end
@@ -31,12 +33,11 @@ module Takagi
     def shutdown!
       puts "[Server] Shutting down all workers..."
 
-      # Ověříme, že existují workery k ukončení
       if @workers.is_a?(Array)
         @workers.each { |worker| worker.exit if worker.alive? }
       end
 
-      Process.kill("TERM", 0) # Pošle SIGTERM všem forknutým workerům
+      Process.kill("TERM", 0)
       puts "[Server] Shutdown complete."
       exit(0)
     end
@@ -71,8 +72,9 @@ module Takagi
     end
 
     def handle_request(request, addr, socket)
-      response = @middleware_stack.call(Takagi::Message::Inbound.new(request))
-
+      inbound_request = Takagi::Message::Inbound.new(request)
+      json_response = @middleware_stack.call(inbound_request)
+      response = inbound_request.to_response("2.05 Content", json_response)
       unless response.is_a?(Takagi::Message::Outbound)
         response = Takagi::Message::Outbound.new(code: "5.00 Internal Server Error", payload: {})
       end
