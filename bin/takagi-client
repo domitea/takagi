@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/takagi"
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: takagi-client [options]"
+
+  opts.on("-s", "--server SERVER", "Takagi server URI") { |s| options[:server] = s }
+  opts.on("-m", "--method METHOD", "HTTP method (get, post, put, delete)") { |m| options[:method] = m.downcase.to_sym }
+  opts.on("-p", "--path PATH", "Resource path") { |p| options[:path] = p }
+  opts.on("-d", "--data DATA", "Payload for POST/PUT") { |d| options[:data] = d }
+  opts.on("-t", "--timeout TIMEOUT", Integer, "Request timeout in seconds") { |t| options[:timeout] = t }
+end.parse!
+
+if options[:server] && options[:method] && options[:path]
+  client = Takagi::Client.new(options[:server], timeout: options[:timeout] || 5)
+  client.on(:response) do |response|
+    puts "[TakagiClient] Received response: #{response}"
+  end
+  client.send(options[:method], options[:path], options[:data])
+  sleep options[:timeout] || 5 # Wait for async response
+else
+  puts "Missing required parameters. Use -h for help."
+end

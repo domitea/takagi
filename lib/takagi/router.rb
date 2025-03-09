@@ -35,6 +35,20 @@ module Takagi
       add_route("POST", path, &block)
     end
 
+    # Registers a PUT route
+    # @param path [String] The URL path
+    # @param block [Proc] The handler function
+    def put(path, &block)
+      add_route("PUT", path, &block)
+    end
+
+    # Registers a DELETE route
+    # @param path [String] The URL path
+    # @param block [Proc] The handler function
+    def delete(path, &block)
+      add_route("DELETE", path, &block)
+    end
+
     def all_routes
       @routes.keys
     end
