@@ -6,7 +6,7 @@
 **Internal definition:** Sinatra for CoAP
 
 - [x] **Takagi Server** → Routing, dynamic paths (`/devices/:id`), basic message parsing.
-- [ ] **Takagi Client** → Enables communication with the Takagi Server.
+- [x] **Takagi Client** → Enables communication with the Takagi Server.
 - [x] **Basic support for URL ID parameters & payloads.**
 - [x] **Logging and debugging for easier development.**
 - [ ] **Sequel support for seamless storing data from CoAP**
