@@ -20,7 +20,6 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
 
   def send_coap_request(_type, method, path, payload = nil)
     message_id = rand(0..0xFFFF)
-    rand(0..255)
 
     method_code = case method
                   when :get then 1
@@ -34,7 +33,11 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     options = path.bytes.prepend(path.length).pack("C*")
 
     packet = header + options
-    packet += "\xFF#{payload}" if payload
+
+    if payload
+      payload = payload.to_bytes if payload.respond_to?(:to_bytes)
+      packet += "\xFF".b + payload.b
+    end
 
     @client.send(packet, 0, *@server_address)
     response, = @client.recvfrom(1024)

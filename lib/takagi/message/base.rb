@@ -38,7 +38,7 @@ module Takagi
       }
 
       def initialize(data = nil)
-        parse(data) if data
+        parse(data) if data.is_a?(String) || data.is_a?(IO)
         @data = data
       end
 
