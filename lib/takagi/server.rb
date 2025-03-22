@@ -85,11 +85,18 @@ module Takagi
     # @param socket [UDPSocket] UDP socket for sending responses
     def handle_request(request, addr, socket)
       inbound_request = Takagi::Message::Inbound.new(request)
-      json_response = @middleware_stack.call(inbound_request)
-      response = inbound_request.to_response("2.05 Content", json_response)
-      unless response.is_a?(Takagi::Message::Outbound)
-        response = Takagi::Message::Outbound.new(code: "5.00 Internal Server Error", payload: {})
-      end
+      result = @middleware_stack.call(inbound_request)
+
+      response =
+        if result.is_a?(Takagi::Message::Outbound)
+          result
+        elsif result.is_a?(Hash)
+          puts "returned #{result} as reponse"
+          inbound_request.to_response("2.05 Content", result)
+        else
+          puts "[Warning] Middleware returned non-Hash: #{result.inspect}"
+          inbound_request.to_response("5.00 Internal Server Error", { error: "Internal Server Error" })
+        end
 
       socket.send(response.to_bytes, 0, addr[3], addr[1])
     rescue => e

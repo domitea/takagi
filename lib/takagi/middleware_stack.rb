@@ -23,7 +23,14 @@ module Takagi
     # @param request [Takagi::Message::Inbound] Incoming request object
     # @return [Takagi::Message::Outbound] The final processed response
     def call(request)
-      app = ->(req) { @router.find_route(req.method.to_s, req.uri.path) || req.to_response("4.04 Not Found", { error: "not found" }) }
+      app = ->(req) {
+        route, params = @router.find_route(req.method.to_s, req.uri.path)
+        if route
+          route.call(params)
+        else
+          req.to_response("4.04 Not Found", { error: "not found" })
+        end
+      }
 
       @middlewares.reverse.reduce(app) do |next_middleware, middleware|
         ->(req) { middleware.call(req, &next_middleware) }

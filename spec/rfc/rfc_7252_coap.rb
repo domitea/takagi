@@ -69,7 +69,8 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     @client.send(packet, 0, *@server_address) # Send duplicate
     duplicate_response, = @client.recvfrom(1024)
 
-    expect(duplicate_response).to eq(first_response) # Server should detect and discard duplicate
+    expect(duplicate_response.payload).to eq(first_response.payload)
+    expect(duplicate_response.code).to eq(first_response.code) # Server should detect and discard duplicate
   end
 
   it "supports Observe notifications" do

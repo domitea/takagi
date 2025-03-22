@@ -64,13 +64,13 @@ module Takagi
         block = @routes["#{method} #{path}"]
         params = {}
 
-        return block.call(params) if block
+        return block, params if block
 
         puts "[Debug] Find dynamic route"
         block, params = match_dynamic_route(method, path)
-        return block.call(params) if block
+        return block, params if block
 
-        Takagi::Message::Outbound.new(code: "4.04 Not Found", payload: {})
+        [nil, {}]
       end
     end
 
