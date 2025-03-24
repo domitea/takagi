@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = 'Sinatra-like framework for CoAP and IoT messaging.'
   spec.homepage = 'https://github.com/domitea/takagi'
   spec.license = 'MIT'
-  spec.required_ruby_version = '>= 3.0.0'
+  spec.required_ruby_version = '>= 3.2.0'
 
   spec.metadata['allowed_push_host'] ||= 'https://rubygems.org'
 

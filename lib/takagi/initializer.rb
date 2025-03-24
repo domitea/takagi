@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Takagi
+  # Let's do some initialization
   class Initializer
     # Runs the initialization logic (e.g., loading configurations, setting up databases)
     def self.run!

@@ -3,6 +3,7 @@
 require 'singleton'
 
 module Takagi
+  # even Sinatra like app needs middleware..
   class MiddlewareStack
     include Singleton
 

@@ -3,6 +3,7 @@
 require 'yaml'
 
 module Takagi
+  # Server class for serving
   class Server
     def initialize(port: 5683, worker_processes: 2, worker_threads: 5)
       @port = port
@@ -42,7 +43,7 @@ module Takagi
 
       Process.kill('TERM', 0) # Sends SIGTERM to all worker processes
       puts '[Server] Shutdown complete.'
-      exit(0) unless ENV["RACK_ENV"] == "test" || defined?(RSpec)
+      exit(0) unless ENV['RACK_ENV'] == 'test' || defined?(RSpec)
     end
 
     private

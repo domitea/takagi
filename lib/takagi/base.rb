@@ -6,6 +6,7 @@ require 'socket'
 require 'json'
 
 module Takagi
+  # Base class that every Takagi based app should use
   class Base < Takagi::Router
     def self.run!(port: 5683)
       Takagi::Server.new(port: port).run!

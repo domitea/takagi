@@ -2,6 +2,7 @@
 
 require 'zeitwerk'
 
+# Coap and Ruby in Sinatra like package
 module Takagi
   class Error < StandardError; end
 

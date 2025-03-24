@@ -23,7 +23,8 @@ module Takagi
         return ''.b unless @code && @payload
 
         begin
-          puts "[Debug] Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, message_id #{@message_id}, token #{@token.inspect}"
+          puts "[Debug] Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, \
+                message_id #{@message_id}, token #{@token.inspect}"
 
           version_type_token_length = 0x60
           header = [version_type_token_length, @code, @message_id, @token.bytesize].pack('CCnC')
