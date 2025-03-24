@@ -7,41 +7,16 @@ require_relative "../../lib/takagi"
 
 RSpec.describe "Takagi RFC 7252 Compliance" do
   before(:all) do
-    @server_thread = Thread.new { Takagi::Base.run!(port: 5683) }
+    port = find_free_port
+    @server_thread = Thread.new { Takagi::Base.run!(port: port) }
     sleep 1 # Give the server time to start
     @client = UDPSocket.new
-    @server_address = ["127.0.0.1", 5683]
+    @server_address = ["127.0.0.1", port]
   end
 
   after(:all) do
     Thread.kill(@server_thread)
     @client.close
-  end
-
-  def send_coap_request(_type, method, path, payload = nil)
-    message_id = rand(0..0xFFFF)
-
-    method_code = case method
-                  when :get then 1
-                  when :post then 2
-                  when :put then 3
-                  when :delete then 4
-                  else 0
-                  end
-
-    header = [64, method_code, (message_id >> 8) & 0xFF, message_id & 0xFF].pack("C*")
-    options = path.bytes.prepend(path.length).pack("C*")
-
-    packet = header + options
-
-    if payload
-      payload = payload.to_bytes if payload.respond_to?(:to_bytes)
-      packet += "\xFF".b + payload.b
-    end
-
-    @client.send(packet, 0, *@server_address)
-    response, = @client.recvfrom(1024)
-    response
   end
 
   it "handles GET requests correctly" do
@@ -64,13 +39,16 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     packet = [64, 1, (message_id >> 8) & 0xFF, message_id & 0xFF].pack("C*") + "/ping".bytes.prepend(5).pack("C*")
 
     @client.send(packet, 0, *@server_address)
-    first_response, = @client.recvfrom(1024)
+    first_response_raw, = @client.recvfrom(1024)
 
     @client.send(packet, 0, *@server_address) # Send duplicate
-    duplicate_response, = @client.recvfrom(1024)
+    duplicate_response_raw, = @client.recvfrom(1024)
 
-    expect(duplicate_response.payload).to eq(first_response.payload)
-    expect(duplicate_response.code).to eq(first_response.code) # Server should detect and discard duplicate
+    first = Takagi::Message::Inbound.new(first_response_raw)
+    duplicate = Takagi::Message::Inbound.new(duplicate_response_raw)
+
+    expect(duplicate.payload).to eq(first.payload)
+    expect(duplicate.code).to eq(first.code) # Server should detect and discard duplicate
   end
 
   it "supports Observe notifications" do

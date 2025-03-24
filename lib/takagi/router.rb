@@ -24,29 +24,29 @@ module Takagi
     # Registers a GET route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def get(path, &block)
-      add_route("GET", path, &block)
+    def get(path, &)
+      add_route('GET', path, &)
     end
 
     # Registers a POST route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def post(path, &block)
-      add_route("POST", path, &block)
+    def post(path, &)
+      add_route('POST', path, &)
     end
 
     # Registers a PUT route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def put(path, &block)
-      add_route("PUT", path, &block)
+    def put(path, &)
+      add_route('PUT', path, &)
     end
 
     # Registers a DELETE route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def delete(path, &block)
-      add_route("DELETE", path, &block)
+    def delete(path, &)
+      add_route('DELETE', path, &)
     end
 
     def all_routes
@@ -64,11 +64,16 @@ module Takagi
         block = @routes["#{method} #{path}"]
         params = {}
 
-        return block, params if block
+        if block
+          return ->(req) { block.arity == 1 ? block.call(req) : block.call }, params
+        end
 
-        puts "[Debug] Find dynamic route"
+        puts '[Debug] Find dynamic route'
         block, params = match_dynamic_route(method, path)
-        return block, params if block
+
+        if block
+          return ->(req) { block.arity == 1 ? block.call(req) : block.call }, params
+        end
 
         [nil, {}]
       end
@@ -82,16 +87,16 @@ module Takagi
     # @return [Array(Proc, Hash)] Matched route handler and extracted parameters
     def match_dynamic_route(method, path)
       @routes.each do |route_key, block|
-        route_method, route_path = route_key.split(" ", 2)
+        route_method, route_path = route_key.split(' ', 2)
         next unless route_method == method
 
-        route_parts = route_path.split("/")
-        path_parts = path.split("/")
+        route_parts = route_path.split('/')
+        path_parts = path.split('/')
         next unless route_parts.length == path_parts.length
 
         params = {}
         match = route_parts.each_with_index.all? do |part, index|
-          if part.start_with?(":")
+          if part.start_with?(':')
             param_name = part[1..]
             params[param_name.to_sym] = path_parts[index]
             true
@@ -107,7 +112,7 @@ module Takagi
         end
       end
 
-      puts "[Debug] No route matched!"
+      puts '[Debug] No route matched!'
       [nil, {}]
     end
   end

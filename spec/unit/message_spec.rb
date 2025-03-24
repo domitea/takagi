@@ -10,8 +10,8 @@ RSpec.describe Takagi::Message do
       # payload="Ping"
       [
         0b01010001, 0x01, 0x12, 0x34, 0xAA,
-        0xB4, 't'.ord, 'e'.ord, 's'.ord, 't'.ord,
-        0xFF, 'P'.ord, 'i'.ord, 'n'.ord, 'g'.ord
+        0xB4, "t".ord, "e".ord, "s".ord, "t".ord,
+        0xFF, "P".ord, "i".ord, "n".ord, "g".ord
       ].pack("C*")
     end
 
@@ -26,7 +26,7 @@ RSpec.describe Takagi::Message do
     it "parses empty payload correctly" do
       empty_payload_packet = [
         0b01010001, 0x01, 0x12, 0x34, 0xAA,
-        0xB4, 't'.ord, 'e'.ord, 's'.ord, 't'.ord
+        0xB4, "t".ord, "e".ord, "s".ord, "t".ord
       ].pack("C*")
 
       parsed = Takagi::Message::Inbound.new(empty_payload_packet)

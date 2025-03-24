@@ -3,15 +3,8 @@
 
 require_relative "../lib/takagi"
 
+# Simple test app for debug and testing purposes.
 class TestApp < Takagi::Base
-  get "/ping" do |_params|
-    { message: "Pong!" }
-  end
-
-  post "/echo" do |params|
-    { received: params }
-  end
-
   get "/users/:id" do |params|
     { received: params }
   end

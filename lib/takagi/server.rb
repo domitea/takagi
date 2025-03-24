@@ -28,23 +28,22 @@ module Takagi
         end
       end
 
-      trap("INT") { shutdown! }
+      trap('INT') { shutdown! }
       Process.waitall
     end
 
     # Gracefully shuts down all workers
     def shutdown!
-      puts "[Server] Shutting down all workers..."
+      puts '[Server] Shutting down all workers...'
 
       if @workers.is_a?(Array)
         @workers.each { |worker| worker.exit if worker.alive? }
       end
 
-      Process.kill("TERM", 0) # Sends SIGTERM to all worker processes
-      puts "[Server] Shutdown complete."
-      exit(0)
+      Process.kill('TERM', 0) # Sends SIGTERM to all worker processes
+      puts '[Server] Shutdown complete.'
+      exit(0) unless ENV["RACK_ENV"] == "test" || defined?(RSpec)
     end
-
 
     private
 
@@ -87,19 +86,29 @@ module Takagi
       inbound_request = Takagi::Message::Inbound.new(request)
       result = @middleware_stack.call(inbound_request)
 
+      puts "[DEBUG] Middleware result class: #{result.class}"
+      puts "[DEBUG] Middleware result inspect: #{result.inspect}"
+
+      if result.is_a?(Hash)
+        puts "[DEBUG] Hash response keys: #{result.keys}"
+        result.each do |k, v|
+          puts "[DEBUG] Key: #{k.inspect} => #{v.inspect} (#{v.class})"
+        end
+      end
+
       response =
         if result.is_a?(Takagi::Message::Outbound)
           result
         elsif result.is_a?(Hash)
           puts "returned #{result} as reponse"
-          inbound_request.to_response("2.05 Content", result)
+          inbound_request.to_response('2.05 Content', result)
         else
           puts "[Warning] Middleware returned non-Hash: #{result.inspect}"
-          inbound_request.to_response("5.00 Internal Server Error", { error: "Internal Server Error" })
+          inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
         end
 
       socket.send(response.to_bytes, 0, addr[3], addr[1])
-    rescue => e
+    rescue StandardError => e
       puts "[Error] handle_request failed: #{e.message}"
     end
   end

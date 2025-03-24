@@ -34,6 +34,6 @@
 # end
 
 target :takagi do
-  check "lib"
-  signature "sig"
+  check 'lib'
+  signature 'sig'
 end

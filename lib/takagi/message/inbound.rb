@@ -2,6 +2,7 @@
 
 module Takagi
   module Message
+    # Class for inbound message that is coming to server
     class Inbound < Base
       attr_reader :method, :uri, :response_code
 
@@ -22,11 +23,11 @@ module Takagi
         options = Thread.current[:options] || {} # Získáme thread-safe verzi options
         puts "[Debug] Options received by parse_coap_uri: #{options.inspect}"
 
-        host = options[3] || "localhost"
+        host = options[3] || 'localhost'
         path_segments = Array(options[11]).flatten
 
-        path = path_segments.empty? ? "/" : "/" + path_segments.join("/")
-        URI::Generic.build(scheme: "coap", host: host, path: path)
+        path = path_segments.empty? ? '/' : "/#{path_segments.join('/')}"
+        URI::Generic.build(scheme: 'coap', host: host, path: path)
       end
     end
   end

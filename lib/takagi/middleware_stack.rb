@@ -23,14 +23,14 @@ module Takagi
     # @param request [Takagi::Message::Inbound] Incoming request object
     # @return [Takagi::Message::Outbound] The final processed response
     def call(request)
-      app = ->(req) {
-        route, params = @router.find_route(req.method.to_s, req.uri.path)
-        if route
-          route.call(params)
+      app = lambda do |req|
+        block, params = @router.find_route(req.method.to_s, req.uri.path)
+        if block
+          block.arity == 2 ? block.call(req, params) : block.call(req)
         else
-          req.to_response("4.04 Not Found", { error: "not found" })
+          req.to_response('4.04 Not Found', { error: 'not found' })
         end
-      }
+      end
 
       @middlewares.reverse.reduce(app) do |next_middleware, middleware|
         ->(req) { middleware.call(req, &next_middleware) }
@@ -41,13 +41,13 @@ module Takagi
 
     # Loads middleware stack from a configuration file
     def load_config
-      config_file = "config/middleware.yml"
+      config_file = 'config/middleware.yml'
       return unless File.exist?(config_file)
 
       config = YAML.load_file(config_file)
       puts "[Debug] Loading Middleware: #{config}"
 
-      config["middlewares"].each do |middleware_name|
+      config['middlewares'].each do |middleware_name|
         klass = Object.const_get("Takagi::Middleware::#{middleware_name}")
         use(klass.new) if klass
       rescue NameError
@@ -56,4 +56,3 @@ module Takagi
     end
   end
 end
-

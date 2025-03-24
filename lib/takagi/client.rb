@@ -23,8 +23,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m get -p /status
-    def get(path, &callback)
-      request(:get, path, nil, &callback)
+    def get(path, &)
+      request(:get, path, nil, &)
     end
 
     # Sends a POST request
@@ -33,8 +33,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m post -p /data -d '{"value": 42}'
-    def post(path, payload, &callback)
-      request(:post, path, payload, &callback)
+    def post(path, payload, &)
+      request(:post, path, payload, &)
     end
 
     # Sends a PUT request
@@ -43,8 +43,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m put -p /config -d '{"setting": "on"}'
-    def put(path, payload, &callback)
-      request(:put, path, payload, &callback)
+    def put(path, payload, &)
+      request(:put, path, payload, &)
     end
 
     # Sends a DELETE request
@@ -52,8 +52,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m delete -p /obsolete
-    def delete(path, &callback)
-      request(:delete, path, nil, &callback)
+    def delete(path, &)
+      request(:delete, path, nil, &)
     end
 
     private
@@ -70,7 +70,7 @@ module Takagi
       begin
         socket = UDPSocket.new
         socket.send(message.encode, 0, uri.host, uri.port || 5683)
-        response, _ = socket.recvfrom(1024)
+        response, = socket.recvfrom(1024)
         socket.close
 
         if callback
@@ -80,7 +80,7 @@ module Takagi
         else
           puts response
         end
-      rescue => e
+      rescue StandardError => e
         puts "TakagiClient Error: #{e.message}"
       end
     end
