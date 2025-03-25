@@ -23,8 +23,16 @@ RSpec.configure do |config|
     port
   end
 
-  def send_coap_request(_type, method, path, payload = nil)
+  def send_coap_request(type, method, path, payload = nil)
     message_id = rand(0..0xFFFF)
+
+    type_code = case type
+                when :con then 0b00
+                when :non then 0b01
+                when :ack then 0b10
+                when :rst then 0b11
+                else 0b00
+                end
 
     method_code = case method
                   when :get then 1
@@ -34,11 +42,18 @@ RSpec.configure do |config|
                   else 0
                   end
 
-    header = [0x40, method_code, (message_id >> 8) & 0xFF, message_id & 0xFF].pack("C*")
-    options = encode_uri_path(path)
+    token = ''.b
+    token_length = token.bytesize
+    version_type_token = (0b01 << 6) | (type_code << 4) | token_length
 
-    packet = header + options
-    packet += "\xFF#{payload}".b if payload
+    header = [version_type_token, method_code, (message_id >> 8) & 0xFF, message_id & 0xFF].pack("C*")
+    options = encode_uri_path(path)
+    packet = header + token + options
+
+    if payload
+      payload = payload.to_s.b
+      packet += "\xFF".b + payload
+    end
 
     @client.send(packet, 0, *@server_address)
     response, = @client.recvfrom(1024)

@@ -85,6 +85,23 @@ module Takagi
     # @param socket [UDPSocket] UDP socket for sending responses
     def handle_request(request, addr, socket)
       inbound_request = Takagi::Message::Inbound.new(request)
+      puts "[DEBUG] Code: #{inbound_request.code}"
+      puts "[DEBUG] Method: #{inbound_request.method}"
+
+      # Unexpected NON → RST
+      if inbound_request.type == 1 && inbound_request.method == "EMPTY"
+        response = Takagi::Message::Outbound.new(code: "0.00", payload: "", token: "", message_id: inbound_request.message_id, type: 3)
+        socket.send(response.to_bytes, 0, addr[3], addr[1])
+        return
+      end
+
+      if inbound_request.code.zero? && inbound_request.method == "EMPTY"
+        # RFC 7252: Empty Confirmable → reply with empty ACK
+        response = Takagi::Message::Outbound.new(code: "0.00", payload: "", token: inbound_request.token, message_id: inbound_request.message_id, type: 2)
+        socket.send(response.to_bytes, 0, addr[3], addr[1])
+        return
+      end
+
       result = @middleware_stack.call(inbound_request)
 
       puts "[DEBUG] Middleware result class: #{result.class}"

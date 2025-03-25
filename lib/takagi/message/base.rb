@@ -7,7 +7,7 @@ module Takagi
       attr_reader :version, :type, :token, :message_id, :payload, :options, :code
 
       COAP_CODES = {
-        0 => 'Empty',
+        0 => 'EMPTY',
         1 => 'GET',
         2 => 'POST',
         3 => 'PUT',
@@ -54,13 +54,16 @@ module Takagi
       private
 
       def parse(data)
-        @version = (data.bytes[0] >> 6) & 0b11
-        @type = (data.bytes[0] >> 4) & 0b11
-        token_length = data.bytes[0] & 0b1111
-        @code = data.bytes[1]
-        @message_id = data.bytes[2..3].pack('C*').unpack1('n')
-        @token = token_length.positive? ? data.bytes[4, token_length].pack('C*') : ''.b
-        @options = parse_options(data.bytes[(4 + token_length)..])
+        bytes = data.bytes
+        @version = (bytes[0] >> 6) & 0b11
+        @type    = (bytes[0] >> 4) & 0b11
+        puts "parsed type: #{@type}"
+        token_length = bytes[0] & 0b1111
+        @code    = bytes[1]
+        puts "parsed code: #{@code}"
+        @message_id = bytes[2..3].pack('C*').unpack1('n')
+        @token   = token_length.positive? ? bytes[4, token_length].pack('C*') : ''.b
+        @options = parse_options(bytes[(4 + token_length)..])
         @payload = extract_payload(data)
       end
 

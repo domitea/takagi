@@ -51,6 +51,41 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     expect(duplicate.code).to eq(first.code) # Server should detect and discard duplicate
   end
 
+  it "responds to empty confirmable with ACK" do
+    message_id = rand(0..0xFFFF)
+    packet = [0x40, 0x00, (message_id >> 8), message_id & 0xFF].pack("C*") # Ver:1, Type:CON, TokenLen:0, Code:0.00
+
+    @client.send(packet, 0, *@server_address)
+    response = @client.recvfrom(1024).first
+
+    header = response.bytes
+    type = (header[0] >> 4) & 0b11
+    version = (header[0] >> 6) & 0b11
+
+    expect(version).to eq(1)              # CoAP version
+    expect(type).to eq(2)                 # ACK
+    expect(header[1]).to eq(0)            # Code: 0.00 Empty Message
+    expect((header[2] << 8) | header[3]).to eq(message_id) # Same message ID
+  end
+
+  it "responds with RST when receiving unexpected NON message" do
+    message_id = rand(0..0xFFFF)
+    # NON (Type: 1), Code: 0.00 (Empty)
+    packet = [0x50, 0x00, (message_id >> 8), message_id & 0xFF].pack("C*")
+
+    @client.send(packet, 0, *@server_address)
+    response = @client.recvfrom(1024).first
+    header = response.bytes
+
+    version = (header[0] >> 6) & 0b11
+    type = (header[0] >> 4) & 0b11
+
+    expect(version).to eq(1)
+    expect(type).to eq(3) # RST
+    expect(header[1]).to eq(0) # Empty code
+    expect((header[2] << 8) | header[3]).to eq(message_id)
+  end
+
   it "supports Observe notifications" do
     pending "Implement CoAP Observe feature in Takagi"
     expect(true).to eq(false)
