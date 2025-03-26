@@ -24,29 +24,29 @@ module Takagi
     # Registers a GET route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def get(path, &)
-      add_route('GET', path, &)
+    def get(path, &block)
+      add_route('GET', path, &block)
     end
 
     # Registers a POST route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def post(path, &)
-      add_route('POST', path, &)
+    def post(path, &block)
+      add_route('POST', path, &block)
     end
 
     # Registers a PUT route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def put(path, &)
-      add_route('PUT', path, &)
+    def put(path, &block)
+      add_route('PUT', path, &block)
     end
 
     # Registers a DELETE route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def delete(path, &)
-      add_route('DELETE', path, &)
+    def delete(path, &block)
+      add_route('DELETE', path, &block)
     end
 
     def all_routes

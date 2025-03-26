@@ -23,8 +23,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m get -p /status
-    def get(path, &)
-      request(:get, path, nil, &)
+    def get(path, &block)
+      request(:get, path, nil, &block)
     end
 
     # Sends a POST request
@@ -33,8 +33,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m post -p /data -d '{"value": 42}'
-    def post(path, payload, &)
-      request(:post, path, payload, &)
+    def post(path, payload, &block)
+      request(:post, path, payload, &block)
     end
 
     # Sends a PUT request
@@ -43,8 +43,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m put -p /config -d '{"setting": "on"}'
-    def put(path, payload, &)
-      request(:put, path, payload, &)
+    def put(path, payload, &block)
+      request(:put, path, payload, &block)
     end
 
     # Sends a DELETE request
@@ -52,8 +52,8 @@ module Takagi
     # @param callback [Proc] (optional) Callback function for processing the response
     # Example CLI usage:
     # ./takagi-client -s coap://localhost:5683 -m delete -p /obsolete
-    def delete(path, &)
-      request(:delete, path, nil, &)
+    def delete(path, &block)
+      request(:delete, path, nil, &block)
     end
 
     private

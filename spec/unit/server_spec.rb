@@ -3,14 +3,14 @@
 require "socket"
 
 RSpec.describe Takagi::Server do
-  it "starts the server and listens on UDP" do
+  it "starts and shuts down cleanly" do
     port = find_free_port
     server = Takagi::Server.new(port: port)
 
-    expect do
-      thread = Thread.new { server.run! }
-      sleep 0.1
-      thread.kill
-    end.not_to raise_error
+    thread = Thread.new { server.run! }
+    sleep 0.1
+  ensure
+    server.shutdown!
+    thread&.join
   end
 end

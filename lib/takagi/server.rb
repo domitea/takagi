@@ -22,11 +22,16 @@ module Takagi
     def run!
       puts "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
       puts "run #{@router.all_routes}"
+
+      @worker_pids = []
+
       @worker_processes.times do
         puts "process with #{@router.all_routes}"
-        fork do
+        pid = fork do
+          Process.setproctitle('takagi-worker')
           start_worker_process(@socket)
         end
+        @worker_pids << pid
       end
 
       trap('INT') { shutdown! }
@@ -35,15 +40,34 @@ module Takagi
 
     # Gracefully shuts down all workers
     def shutdown!
+      return if @shutdown_called
+
+      @shutdown_called = true
+
       puts '[Server] Shutting down all workers...'
 
-      if @workers.is_a?(Array)
-        @workers.each { |worker| worker.exit if worker.alive? }
+      if @socket && !@socket.closed?
+        begin
+          @socket.close
+        rescue StandardError
+          nil
+        end
+        puts '[Server] Socket closed.'
       end
 
-      Process.kill('TERM', 0) # Sends SIGTERM to all worker processes
+      if @worker_pids.is_a?(Array)
+        @worker_pids.each do |pid|
+          Process.kill('TERM', pid)
+        rescue Errno::ESRCH
+          puts "[Server] Process #{pid} already exited"
+        end
+      end
+
       puts '[Server] Shutdown complete.'
-      exit(0) unless ENV['RACK_ENV'] == 'test' || defined?(RSpec)
+
+      return if ENV['RACK_ENV'] == 'test' || defined?(RSpec)
+
+      exit(0)
     end
 
     private
@@ -89,15 +113,16 @@ module Takagi
       puts "[DEBUG] Method: #{inbound_request.method}"
 
       # Unexpected NON → RST
-      if inbound_request.type == 1 && inbound_request.method == "EMPTY"
-        response = Takagi::Message::Outbound.new(code: "0.00", payload: "", token: "", message_id: inbound_request.message_id, type: 3)
+      if inbound_request.type == 1 && inbound_request.method == 'EMPTY'
+        response = Takagi::Message::Outbound.new(code: '0.00', payload: '', token: '', message_id: inbound_request.message_id, type: 3)
         socket.send(response.to_bytes, 0, addr[3], addr[1])
         return
       end
 
-      if inbound_request.code.zero? && inbound_request.method == "EMPTY"
+      if inbound_request.code.zero? && inbound_request.method == 'EMPTY'
         # RFC 7252: Empty Confirmable → reply with empty ACK
-        response = Takagi::Message::Outbound.new(code: "0.00", payload: "", token: inbound_request.token, message_id: inbound_request.message_id, type: 2)
+        response = Takagi::Message::Outbound.new(code: '0.00', payload: '', token: inbound_request.token,
+                                                 message_id: inbound_request.message_id, type: 2)
         socket.send(response.to_bytes, 0, addr[3], addr[1])
         return
       end

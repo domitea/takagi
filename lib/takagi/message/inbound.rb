@@ -17,10 +17,10 @@ module Takagi
 
       def to_response(code, payload)
         response_type = case @type
-                  when 0 then 2  # CON → ACK
-                  when 1 then 1  # NON → NON
-                  else 3         # fallback → RST
-                  end
+                        when 0 then 2  # CON → ACK
+                        when 1 then 1  # NON → NON
+                        else 3 # fallback → RST
+                        end
 
         Outbound.new(code: code, payload: payload, token: @token, message_id: @message_id, type: response_type)
       end

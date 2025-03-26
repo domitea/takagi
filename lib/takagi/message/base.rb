@@ -59,7 +59,7 @@ module Takagi
         @type    = (bytes[0] >> 4) & 0b11
         puts "parsed type: #{@type}"
         token_length = bytes[0] & 0b1111
-        @code    = bytes[1]
+        @code = bytes[1]
         puts "parsed code: #{@code}"
         @message_id = bytes[2..3].pack('C*').unpack1('n')
         @token   = token_length.positive? ? bytes[4, token_length].pack('C*') : ''.b

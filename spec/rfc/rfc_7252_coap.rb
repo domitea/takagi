@@ -8,14 +8,13 @@ require_relative "../../lib/takagi"
 RSpec.describe "Takagi RFC 7252 Compliance" do
   before(:all) do
     port = find_free_port
-    @server_thread = Thread.new { Takagi::Base.run!(port: port) }
-    sleep 1 # Give the server time to start
+    @server = Takagi::Base.spawn!(port: port)
     @client = UDPSocket.new
     @server_address = ["127.0.0.1", port]
   end
 
   after(:all) do
-    Thread.kill(@server_thread)
+    @server.shutdown!
     @client.close
   end
 

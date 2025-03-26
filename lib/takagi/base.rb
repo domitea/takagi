@@ -12,6 +12,12 @@ module Takagi
       Takagi::Server.new(port: port).run!
     end
 
+    def self.spawn!(port: 5683)
+      server = Takagi::Server.new(port: port)
+      Thread.new { server.run! }
+      server
+    end
+
     def self.router
       @router ||= Takagi::Router.instance
     end
@@ -19,29 +25,29 @@ module Takagi
     # Registers a GET route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.get(path, &)
-      router.get(path, &)
+    def self.get(path, &block)
+      router.get(path, &block)
     end
 
     # Registers a POST route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.post(path, &)
-      router.post(path, &)
+    def self.post(path, &block)
+      router.post(path, &block)
     end
 
     # Registers a PUT route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.put(path, &)
-      router.post(path, &)
+    def self.put(path, &block)
+      router.post(path, &block)
     end
 
     # Registers a DELETE route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.delete(path, &)
-      router.post(path, &)
+    def self.delete(path, &block)
+      router.post(path, &block)
     end
 
     def self.call(request)
