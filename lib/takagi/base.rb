@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'rack'
-require 'sequel'
 require 'socket'
 require 'json'
 
