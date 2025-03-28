@@ -7,7 +7,14 @@ require 'json'
 module Takagi
   # Base class that every Takagi based app should use
   class Base < Takagi::Router
-    def self.run!(port: 5683)
+    def self.boot!(config_path: 'config/takagi.yml')
+      Takagi.config.load_file(config_path) if File.exist?(config_path)
+      Takagi::Initializer.run!
+    end
+
+    def self.run!(port: nil, config_path: 'config/takagi.yml')
+      boot!(config_path: config_path)
+      port ||= Takagi.config.port
       Takagi::Server.new(port: port).run!
     end
 
