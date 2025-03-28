@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-class Config
   require 'yaml'
   require 'logger'
   require 'ostruct'
@@ -61,5 +60,3 @@ class Config
       yield(config)
     end
   end
-
-end
