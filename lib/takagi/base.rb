@@ -15,7 +15,9 @@ module Takagi
     def self.run!(port: nil, config_path: 'config/takagi.yml')
       boot!(config_path: config_path)
       port ||= Takagi.config.port
-      Takagi::Server.new(port: port).run!
+      processes = Takagi.config.processes
+      threads = Takagi.config.threads
+      Takagi::Server.new(port: port, worker_processes: processes, worker_threads: threads).run!
     end
 
     def self.spawn!(port: 5683)

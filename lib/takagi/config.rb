@@ -6,12 +6,14 @@
 
   module Takagi
     class Config
-      attr_accessor :port, :logger, :observability, :auto_migrate, :custom
+      attr_accessor :port, :logger, :observability, :auto_migrate, :custom, :processes, :threads
 
       def initialize
         @port = 5683
-        @logger = Logger.new($stdout)
+        @logger = Logger.new
         @auto_migrate = true
+        @threads = 1
+        @processes = 1
         @observability = OpenStruct.new(backends: [:memory])
         @custom = {}
       end
@@ -26,9 +28,9 @@
 
       def method_missing(name, *args, &block)
         key = name.to_s.chomp('=').to_sym
-        if name.to_s.end_with?('=')
+        if name.to_s.end_with?('=') # setter
           @custom[key] = args.first
-        elsif @custom.key?(key)
+        elsif @custom.key?(key) # getter
           @custom[key]
         else
           super
@@ -44,19 +46,13 @@
         data = YAML.load_file(path)
 
         @port = data['port'] if data['port']
-        @logger = Logger.new(data['logger']) if data['logger']
+        @logger = Logger.new() if data['logger']
+        @processes = data['process'] if data['process']
+        @threads = data['threads'] if data['threads']
         if data['observability']
           @observability.backends = data['observability']['backends'].map(&:to_sym)
         end
         data['custom']&.each { |k, v| self[k] = v }
       end
-    end
-
-    def self.config
-      @config ||= Config.new
-    end
-
-    def self.configure
-      yield(config)
     end
   end

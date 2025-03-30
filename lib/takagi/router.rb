@@ -7,7 +7,8 @@ module Takagi
     include Singleton
     def initialize
       @routes = {}
-      @routes_mutex = Mutex.new # Protects route modifications in multi-threaded environments
+      @routes_mutex = Mutex.new # Protects route modifications in multithreaded environments
+      @logger = Takagi.logger
     end
 
     # Registers a new route for a given HTTP method and path
@@ -17,7 +18,7 @@ module Takagi
     def add_route(method, path, &block)
       @routes_mutex.synchronize do
         @routes["#{method} #{path}"] = block
-        puts "[Debug] Add new route: #{method} #{path}"
+        @logger.debug "Add new route: #{method} #{path}"
       end
     end
 
@@ -59,8 +60,8 @@ module Takagi
     # @return [Proc, Hash] The matching handler and extracted parameters
     def find_route(method, path)
       @routes_mutex.synchronize do
-        puts "[Debug] Routes: #{@routes.inspect}"
-        puts "[Debug] Looking for route: #{method} #{path}"
+        @logger.debug "Routes: #{@routes.inspect}"
+        @logger.debug "Looking for route: #{method} #{path}"
         block = @routes["#{method} #{path}"]
         params = {}
 
@@ -68,7 +69,7 @@ module Takagi
           return ->(req) { block.arity == 1 ? block.call(req) : block.call }, params
         end
 
-        puts '[Debug] Find dynamic route'
+        @logger.debug '[Debug] Find dynamic route'
         block, params = match_dynamic_route(method, path)
 
         if block
@@ -105,14 +106,14 @@ module Takagi
           end
         end
         if match
-          puts "[Debug] Match found! Params: #{params.inspect}"
+          @logger.debug "Match found! Params: #{params.inspect}"
           return block, params
         else
-          puts "[Debug] No Match found! Params: #{params.inspect} to #{path}"
+          @logger.debug "No Match found! Params: #{params.inspect} to #{path}"
         end
       end
 
-      puts '[Debug] No route matched!'
+      @logger.debug 'No route matched!'
       [nil, {}]
     end
   end

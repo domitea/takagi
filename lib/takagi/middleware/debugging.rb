@@ -6,9 +6,9 @@ module Takagi
       # Logs request details before passing it to the next middleware
       # @param request [Takagi::Message::Inbound] Incoming CoAP request
       def call(request)
-        puts "[Debug] Request Details: #{request.inspect}"
+        Takagi.logger.debug "Request Details: #{request.inspect}"
         response = yield request
-        puts "[Debug] Response Details: #{response.inspect}"
+        Takagi.logger.debug "Response Details: #{response.inspect}"
         response
       end
     end

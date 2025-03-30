@@ -24,7 +24,7 @@ module Takagi
         return ''.b unless @code
 
         begin
-          puts "[Debug] Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, \
+          @logger.debug "Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, \
             message_id #{@message_id}, token #{@token.inspect}, type #{@type}"
 
           version = 1
@@ -42,11 +42,11 @@ module Takagi
 
           packet = (header + token_payload + payload_part).b
 
-          puts "[Debug] Final CoAP packet: #{packet.inspect}"
+          @logger.debug "Final CoAP packet: #{packet.inspect}"
 
           packet
         rescue StandardError => e
-          puts "[Error] to_bytes failed: #{e.message} at #{e.backtrace.first}"
+          @logger.error "To_bytes failed: #{e.message} at #{e.backtrace.first}"
           ''.b
         end
       end

@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../lib/takagi"
+require 'optparse'
 
 options = {}
 OptionParser.new do |opts|
@@ -14,7 +15,16 @@ OptionParser.new do |opts|
   opts.on("-t", "--timeout TIMEOUT", Integer, "Request timeout in seconds") { |t| options[:timeout] = t }
 end.parse!
 
-if options[:server] && options[:method] && options[:path]
+# Ping request
+if options[:server] && options[:method] == "get" && options[:path] == "/ping"
+  client = Takagi::Client.new(options[:server], timeout: options[:timeout] || 5)
+  client.on(:response) do |response|
+    puts "[TakagiClient] Received response: #{response}"
+  end
+  client.send(:get, "/ping")  # Sends a ping request to the /ping route
+  sleep options[:timeout] || 5 # Wait for async response
+elsif options[:server] && options[:method] && options[:path]
+  # Handle other methods (POST, PUT, DELETE)
   client = Takagi::Client.new(options[:server], timeout: options[:timeout] || 5)
   client.on(:response) do |response|
     puts "[TakagiClient] Received response: #{response}"

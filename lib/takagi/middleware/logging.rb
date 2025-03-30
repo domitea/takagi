@@ -4,9 +4,9 @@ module Takagi
   module Middleware
     class Logging
       def call(request)
-        puts "[Middleware] Received request: #{request.uri.path}"
+        Takagi.logger.info "Received request: #{request.uri.path}"
         response = yield request
-        puts "[Middleware] Response code: #{response.code}, Payload: #{response.payload}"
+        Takagi.logger.info "Response code: #{response.code}, Payload: #{response.payload}"
         response
       end
     end

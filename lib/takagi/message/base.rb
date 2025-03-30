@@ -41,6 +41,7 @@ module Takagi
       def initialize(data = nil)
         parse(data) if data.is_a?(String) || data.is_a?(IO)
         @data = data
+        @logger = Takagi.logger
       end
 
       def coap_code_to_method(code)
@@ -57,10 +58,8 @@ module Takagi
         bytes = data.bytes
         @version = (bytes[0] >> 6) & 0b11
         @type    = (bytes[0] >> 4) & 0b11
-        puts "parsed type: #{@type}"
         token_length = bytes[0] & 0b1111
         @code = bytes[1]
-        puts "parsed code: #{@code}"
         @message_id = bytes[2..3].pack('C*').unpack1('n')
         @token   = token_length.positive? ? bytes[4, token_length].pack('C*') : ''.b
         @options = parse_options(bytes[(4 + token_length)..])
@@ -92,10 +91,11 @@ module Takagi
           last_option = option_number
         end
 
-        puts "[Debug] Parsed CoAP options: #{Thread.current[:options].inspect}"
+        Takagi.logger.debug "Parsed CoAP options: #{Thread.current[:options].inspect}"
       end
 
       def extract_payload(data)
+        Takagi.logger.debug "Extracting payload: #{data.inspect}"
         payload_start = data.index("\xFF".b)
         return nil unless payload_start
 

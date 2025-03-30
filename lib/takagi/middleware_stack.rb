@@ -8,6 +8,7 @@ module Takagi
     include Singleton
 
     def initialize
+      @logger = Takagi.logger
       @middlewares = []
       @router = Takagi::Router.instance
       load_config
@@ -46,13 +47,13 @@ module Takagi
       return unless File.exist?(config_file)
 
       config = YAML.load_file(config_file)
-      puts "[Debug] Loading Middleware: #{config}"
+      @logger.debug "Loading Middleware: #{config}"
 
       config['middlewares'].each do |middleware_name|
         klass = Object.const_get("Takagi::Middleware::#{middleware_name}")
         use(klass.new) if klass
       rescue NameError
-        puts "[Warning] Middleware #{middleware_name} nenalezen!"
+        @logger.warn "Middleware #{middleware_name} not found!"
       end
     end
   end

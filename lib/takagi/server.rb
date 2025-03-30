@@ -1,16 +1,15 @@
 # frozen_string_literal: true
 
-require 'yaml'
-
 module Takagi
   # Server class for serving
   class Server
-    def initialize(port: 5683, worker_processes: 2, worker_threads: 5)
+    def initialize(port: 5683, worker_processes: 2, worker_threads: 2)
       @port = port
       @worker_processes = worker_processes
       @worker_threads = worker_threads
       @middleware_stack = Takagi::MiddlewareStack.instance
       @router = Takagi::Router.instance
+      @logger = Takagi.logger
 
       Initializer.run! # Load any initialization logic
 
@@ -20,13 +19,12 @@ module Takagi
 
     # Starts the server with multiple worker processes
     def run!
-      puts "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
-      puts "run #{@router.all_routes}"
+      @logger.info "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
+      @logger.debug "run #{@router.all_routes}"
 
       @worker_pids = []
-
       @worker_processes.times do
-        puts "process with #{@router.all_routes}"
+        @logger.debug "process with #{@router.all_routes}"
         pid = fork do
           Process.setproctitle('takagi-worker')
           start_worker_process(@socket)
@@ -39,12 +37,13 @@ module Takagi
     end
 
     # Gracefully shuts down all workers
+    # TODO: Implement better logging with signal handling.
     def shutdown!
       return if @shutdown_called
 
       @shutdown_called = true
 
-      puts '[Server] Shutting down all workers...'
+      #@logger.info '[Server] Shutting down all workers...'
 
       if @socket && !@socket.closed?
         begin
@@ -52,18 +51,18 @@ module Takagi
         rescue StandardError
           nil
         end
-        puts '[Server] Socket closed.'
+        #@logger.info '[Server] Socket closed.'
       end
 
       if @worker_pids.is_a?(Array)
         @worker_pids.each do |pid|
           Process.kill('TERM', pid)
         rescue Errno::ESRCH
-          puts "[Server] Process #{pid} already exited"
+          # @logger.debug "[Server] Process #{pid} already exited"
         end
       end
 
-      puts '[Server] Shutdown complete.'
+      #@logger.info '[Server] Shutdown complete.'
 
       return if ENV['RACK_ENV'] == 'test' || defined?(RSpec)
 
@@ -78,7 +77,7 @@ module Takagi
       queue = Queue.new
       @workers = Array.new(@worker_threads) { start_thread_worker(queue, socket) }
 
-      puts "[Worker PID: #{Process.pid}] Listening on CoAP://0.0.0.0:#{@port} with #{@worker_threads} threads"
+      @logger.debug "[Worker PID: #{Process.pid}] Listening on CoAP://0.0.0.0:#{@port} with #{@worker_threads} threads"
 
       loop do
         if socket.wait_readable(1)
@@ -87,7 +86,7 @@ module Takagi
         end
       end
     rescue Interrupt
-      puts "[Worker PID: #{Process.pid}] Shutting down..."
+      @logger.debug "[Worker PID: #{Process.pid}] Shutting down..."
       exit(0)
     end
 
@@ -109,8 +108,8 @@ module Takagi
     # @param socket [UDPSocket] UDP socket for sending responses
     def handle_request(request, addr, socket)
       inbound_request = Takagi::Message::Inbound.new(request)
-      puts "[DEBUG] Code: #{inbound_request.code}"
-      puts "[DEBUG] Method: #{inbound_request.method}"
+      @logger.debug "Code: #{inbound_request.code}"
+      @logger.debug "Method: #{inbound_request.method}"
 
       # Unexpected NON → RST
       if inbound_request.type == 1 && inbound_request.method == 'EMPTY'
@@ -129,13 +128,13 @@ module Takagi
 
       result = @middleware_stack.call(inbound_request)
 
-      puts "[DEBUG] Middleware result class: #{result.class}"
-      puts "[DEBUG] Middleware result inspect: #{result.inspect}"
+      @logger.debug "Middleware result class: #{result.class}"
+      @logger.debug "Middleware result inspect: #{result.inspect}"
 
       if result.is_a?(Hash)
-        puts "[DEBUG] Hash response keys: #{result.keys}"
+        @logger.debug "Hash response keys: #{result.keys}"
         result.each do |k, v|
-          puts "[DEBUG] Key: #{k.inspect} => #{v.inspect} (#{v.class})"
+          @logger.debug "Key: #{k.inspect} => #{v.inspect} (#{v.class})"
         end
       end
 
@@ -143,16 +142,16 @@ module Takagi
         if result.is_a?(Takagi::Message::Outbound)
           result
         elsif result.is_a?(Hash)
-          puts "returned #{result} as reponse"
+          @logger.debug "Returned #{result} as reponse"
           inbound_request.to_response('2.05 Content', result)
         else
-          puts "[Warning] Middleware returned non-Hash: #{result.inspect}"
+          @logger.warn "Middleware returned non-Hash: #{result.inspect}"
           inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
         end
 
       socket.send(response.to_bytes, 0, addr[3], addr[1])
     rescue StandardError => e
-      puts "[Error] handle_request failed: #{e.message}"
+      @logger.error "Handle_request failed: #{e.message}"
     end
   end
 end

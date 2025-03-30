@@ -10,5 +10,5 @@ class TestApp < Takagi::Base
   end
 end
 
-puts "Starting Takagi test server..."
+Takagi.logger.info "Starting Takagi test server..."
 TestApp.run!

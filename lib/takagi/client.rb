@@ -18,6 +18,13 @@ module Takagi
       @callbacks = {}
     end
 
+    # Registers a callback for a given event
+    # @param event [Symbol] Event name (e.g., :response)
+    # @param callback [Proc] Callback function to handle the event
+    def on(event, &callback)
+      @callbacks[event] = callback
+    end
+
     # Sends a GET request
     # @param path [String] Resource path
     # @param callback [Proc] (optional) Callback function for processing the response
