@@ -48,14 +48,18 @@ module Takagi
     # @param path [String] The URL path
     # @param block [Proc] The request handler
     def self.put(path, &block)
-      router.post(path, &block)
+      router.put(path, &block)
     end
 
     # Registers a DELETE route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
     def self.delete(path, &block)
-      router.post(path, &block)
+      router.delete(path, &block)
+    end
+
+    def self.observe(path, &block)
+      router.observe(path, &block)
     end
 
     def self.call(request)

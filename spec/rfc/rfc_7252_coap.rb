@@ -85,11 +85,6 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     expect((header[2] << 8) | header[3]).to eq(message_id)
   end
 
-  it "supports Observe notifications" do
-    pending "Implement CoAP Observe feature in Takagi"
-    expect(true).to eq(false)
-  end
-
   it "handles large payloads with block-wise transfers" do
     pending "Implement block-wise transfers in Takagi"
     expect(true).to eq(false)

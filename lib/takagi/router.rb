@@ -50,8 +50,19 @@ module Takagi
       add_route('DELETE', path, &block)
     end
 
+    # Registers a OBSERVE route
+    # @param path [String] The URL path
+    # @param block [Proc] The handler function
+    def observe(path, &block)
+      add_route('OBSERVE', path, &block)
+    end
+
     def all_routes
       @routes.keys
+    end
+
+    def find_observable(path)
+      @routes.find { |key, _| key.start_with?('OBSERVE') && key.split.last == path }
     end
 
     # Finds a registered route for a given method and path

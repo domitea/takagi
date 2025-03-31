@@ -10,11 +10,14 @@ module Takagi
       @middleware_stack = Takagi::MiddlewareStack.instance
       @router = Takagi::Router.instance
       @logger = Takagi.logger
+      @watcher = Takagi::Observer::Watcher.new(interval: 1)
 
       Initializer.run! # Load any initialization logic
 
       @socket = UDPSocket.new
       @socket.bind('0.0.0.0', @port)
+      Takagi::Network::UdpSender.instance.setup(socket: @socket)
+      @sender = Takagi::Network::UdpSender.instance
     end
 
     # Starts the server with multiple worker processes
@@ -32,6 +35,8 @@ module Takagi
         @worker_pids << pid
       end
 
+      @watcher.start
+
       trap('INT') { shutdown! }
       Process.waitall
     end
@@ -42,6 +47,8 @@ module Takagi
       return if @shutdown_called
 
       @shutdown_called = true
+
+      @watcher.stop
 
       #@logger.info '[Server] Shutting down all workers...'
 
@@ -149,7 +156,7 @@ module Takagi
           inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
         end
 
-      socket.send(response.to_bytes, 0, addr[3], addr[1])
+      @sender.transmit(response, addr[3], addr[1])
     rescue StandardError => e
       @logger.error "Handle_request failed: #{e.message}"
     end
