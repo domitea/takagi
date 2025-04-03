@@ -58,7 +58,7 @@ module Takagi
       router.delete(path, &block)
     end
 
-    def self.observe(path, &block)
+    def self.observable(path, &block)
       router.observe(path, &block)
     end
 

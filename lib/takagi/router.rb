@@ -53,7 +53,7 @@ module Takagi
     # Registers a OBSERVE route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def observe(path, &block)
+    def observable(path, &block)
       add_route('OBSERVE', path, &block)
     end
 
