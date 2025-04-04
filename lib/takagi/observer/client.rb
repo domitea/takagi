@@ -19,6 +19,11 @@ module Takagi
         listen_for_notifications
       end
 
+      def stop
+        @running = false
+        @socket.close unless @socket.closed?
+      end
+
       private
 
       def send_observe_request
@@ -32,18 +37,26 @@ module Takagi
       end
 
       def listen_for_notifications
-        Thread.new do
-          loop do
-            data, _addr = @socket.recvfrom(1024)
+      @running = true
+      @thread = Thread.new do
+        while @running
+          begin
+            data, _addr = @socket.recvfrom_nonblock(1024)
             inbound = Takagi::Message::Inbound.new(data)
             next unless inbound.token == @token
 
             payload = inbound.payload
             Takagi.logger.info "Received notify: #{payload}"
             @on_notify&.call(payload, inbound)
+          rescue IO::WaitReadable
+            @socket.wait_readable
+            retry
+          rescue IOError
+            break
           end
         end
       end
+    end
     end
   end
 end

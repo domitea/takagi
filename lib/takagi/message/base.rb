@@ -45,7 +45,11 @@ module Takagi
       end
 
       def coap_code_to_method(code)
-        COAP_CODES[code] || 'UNKNOWN'
+        if code == 1 && @options && @options[6]
+          'OBSERVE'
+        else
+          COAP_CODES[code] || 'UNKNOWN'
+        end
       end
 
       def coap_method_to_code(method)
@@ -68,30 +72,44 @@ module Takagi
 
       def parse_options(bytes)
         Thread.current[:options] = {}
+        pos = 0
+        last_option_number = 0
 
-        options_start = 0
-        last_option = 0
+        while pos < bytes.length && bytes[pos] != 0xFF
+          byte = bytes[pos]
+          pos += 1
 
-        while options_start < bytes.length && bytes[options_start] != 255 # 0xFF = start of payload
-          delta = (bytes[options_start] >> 4) & 0x0F
-          len = bytes[options_start] & 0x0F
-          options_start += 1
+          delta_raw = (byte >> 4) & 0x0F
+          len_raw   = byte & 0x0F
 
-          option_number = last_option + delta
-          option_value = bytes[options_start, len].pack('C*').b
+          delta = case delta_raw
+                  when 13 then bytes[pos] + 13.tap { pos += 1 }
+                  when 14 then bytes[pos, 2].pack('C*').unpack1('n') + 269.tap { pos += 2 }
+                  else delta_raw
+                  end
+
+          length = case len_raw
+                   when 13 then bytes[pos] + 13.tap { pos += 1 }
+                   when 14 then bytes[pos, 2].pack('C*').unpack1('n') + 269.tap { pos += 2 }
+                   else len_raw
+                   end
+
+          option_number = last_option_number + delta
+          value = bytes[pos, length].pack('C*')
+          pos += length
 
           if option_number == 11
             Thread.current[:options][11] ||= []
-            Thread.current[:options][11] << option_value.force_encoding('UTF-8')
+            Thread.current[:options][11] << value.force_encoding('UTF-8')
           else
-            Thread.current[:options][option_number] = option_value.force_encoding('UTF-8')
+            Thread.current[:options][option_number] = value.force_encoding('UTF-8')
           end
 
-          options_start += len
-          last_option = option_number
+          last_option_number = option_number
         end
 
         Takagi.logger.debug "Parsed CoAP options: #{Thread.current[:options].inspect}"
+        Thread.current[:options]
       end
 
       def extract_payload(data)

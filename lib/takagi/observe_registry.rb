@@ -21,18 +21,27 @@ module Takagi
       def notify(path, new_value)
         return unless @subscriptions[path]
 
+        Takagi.logger.debug "Notify called for: #{path}"
+        Takagi.logger.debug "Subscriptions: #{@subscriptions.inspect}"
+
         @subscriptions[path].each do |sub|
           should_notify = true
 
           if sub[:delta] && sub[:last_value]
-            delta_diff = (sub[:last_value] - new_value).abs
+            delta_diff = (sub[:last_value] - new_value).abs rescue true
             should_notify = delta_diff >= sub[:delta]
           end
 
           next unless should_notify
 
-          Takagi.logger.debug "Notifying #{sub[:address]}:#{sub[:port]} about #{path} = #{new_value}"
-          sender.send_packet(sub, new_value)
+          if sub[:handler]
+            Takagi.logger.debug "Calling local handler for #{path}"
+            sub[:handler].call(new_value, nil)
+          else
+            Takagi.logger.debug "Sending packet to #{sub[:address]}:#{sub[:port]}"
+            sender.send_packet(sub, new_value)
+          end
+
           sub[:last_value] = new_value
           sub[:last_seq] = (sub[:last_seq] || 0) + 1
         end

@@ -19,7 +19,8 @@ module Takagi
               observable_route = Takagi::Base.router.find_observable(path)
               next unless observable_route
 
-              current_value = observable_route.last[:handler].call(nil)
+              handler = observable_route.last
+              current_value = handler.call(nil)
 
               Takagi::ObserveRegistry.notify(path, current_value)
             end

@@ -2,6 +2,14 @@
 
 require "takagi"
 
+def find_free_port
+  socket = UDPSocket.new
+  socket.bind("127.0.0.1", 0)
+  port = socket.addr[1]
+  socket.close
+  port
+end
+
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
@@ -14,14 +22,6 @@ RSpec.configure do |config|
   end
 
   Dir["#{File.dirname(__FILE__)}/**/*.rb"].each { |file| require file }
-
-  def find_free_port
-    socket = UDPSocket.new
-    socket.bind("127.0.0.1", 0)
-    port = socket.addr[1]
-    socket.close
-    port
-  end
 
   def send_coap_request(type, method, path, payload = nil)
     message_id = rand(0..0xFFFF)

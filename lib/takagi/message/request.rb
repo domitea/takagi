@@ -40,21 +40,45 @@ module Takagi
       private
 
       def encode_options
-        # Uri-Path options
-        options = @uri.path.split('/').reject(&:empty?).map do |segment|
-          encode_option(11, segment) # Uri-Path = 11
+        last_option_number = 0
+        encoded = []
+
+        # Observe musí jít jako PRVNÍ, aby delta vyšla správně
+        unless @observe.nil?
+          encoded << encode_option(6, [@observe].pack('C'), last_option_number)
+          last_option_number = 6
         end
-        # Observe option
-        if @observe
-          options << encode_option(6, [@observe].pack('C')) # Observe = 6
+
+        @uri.path.split('/').reject(&:empty?).each do |segment|
+          encoded << encode_option(11, segment, last_option_number)
+          last_option_number = 11
         end
-        options.join.b
+
+        encoded.join.b
       end
 
-      def encode_option(number, value)
-        delta = number
+      def encode_option(option_number, value, last_option_number)
+        delta = option_number - last_option_number
         length = value.bytesize
-        [(delta << 4) | length, value].pack('CA*')
+
+        delta_encoded, delta_extra = encode_extended(delta)
+        length_encoded, length_extra = encode_extended(length)
+
+        option_header = [(delta_encoded << 4) | length_encoded].pack('C')
+        option_header + delta_extra + length_extra + value.b
+      end
+
+      def encode_extended(val)
+        case val
+        when 0..12
+          [val, '']
+        when 13..268
+          [13, [val - 13].pack('C')]
+        when 269..65804
+          [14, [val - 269].pack('n')]
+        else
+          raise "Unsupported option delta/length: #{val}"
+        end
       end
     end
   end

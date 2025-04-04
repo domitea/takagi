@@ -23,6 +23,7 @@ module Takagi
     # Starts the server with multiple worker processes
     def run!
       @logger.info "Starting Takagi server with #{@worker_processes} processes and #{@worker_threads} threads per process..."
+      @logger.info "Takagi server has version #{Takagi::VERSION} with name '#{Takagi::NAME}'"
       @logger.debug "run #{@router.all_routes}"
 
       @worker_pids = []
@@ -34,6 +35,8 @@ module Takagi
         end
         @worker_pids << pid
       end
+
+      Takagi::ReactorRegistry.start_all
 
       @watcher.start
 
@@ -69,6 +72,7 @@ module Takagi
         end
       end
 
+      Takagi::ReactorRegistry.stop_all
       #@logger.info '[Server] Shutdown complete.'
 
       return if ENV['RACK_ENV'] == 'test' || defined?(RSpec)

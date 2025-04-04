@@ -58,10 +58,6 @@ module Takagi
       router.delete(path, &block)
     end
 
-    def self.observable(path, &block)
-      router.observe(path, &block)
-    end
-
     def self.call(request)
       middleware_stack.call(request)
     end
@@ -72,6 +68,21 @@ module Takagi
 
     def self.use(middleware)
       middleware_stack.use(middleware)
+    end
+
+    def self.reactor(&block)
+      reactor_instance = Takagi::Reactor.new
+      reactor_instance.instance_eval(&block)
+      Takagi::ReactorRegistry.register(reactor_instance)
+    end
+
+    def self.use_reactor(klass)
+      reactor_instance = klass.new
+      Takagi::ReactorRegistry.register(reactor_instance)
+    end
+
+    def self.start_reactors
+      Takagi::ReactorRegistry.start_all
     end
 
     get '/ping' do # basic route for simple checking
