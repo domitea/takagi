@@ -65,18 +65,18 @@ module Takagi
 
     private
 
-    # Executes a request to the server using Takagi::Message::OutboundMessage
+    # Executes a request to the server using Takagi::Message::Request
     # @param method [Symbol] HTTP method (:get, :post, :put, :delete)
     # @param path [String] Resource path
     # @param payload [String] (optional) Data for POST/PUT requests
     # @param callback [Proc] (optional) Callback function for processing the response
     def request(method, path, payload = nil, &callback)
       uri = URI.join(server_uri.to_s, path)
-      message = Takagi::Message::OutboundMessage.new(method: method, uri: uri, payload: payload)
+      message = Takagi::Message::Request.new(method: method, uri: uri, payload: payload)
 
       begin
         socket = UDPSocket.new
-        socket.send(message.encode, 0, uri.host, uri.port || 5683)
+        socket.send(message.to_bytes, 0, uri.host, uri.port || 5683)
         response, = socket.recvfrom(1024)
         socket.close
 
