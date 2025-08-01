@@ -3,6 +3,7 @@
 require 'rack'
 require 'socket'
 require 'json'
+require 'takagi/server/multi'
 
 module Takagi
   # Base class that every Takagi based app should use
@@ -12,18 +13,57 @@ module Takagi
       Takagi::Initializer.run!
     end
 
-    def self.run!(port: nil, config_path: 'config/takagi.yml')
+    def self.run!(port: nil, config_path: 'config/takagi.yml', protocols: nil, protocol: :udp)
       boot!(config_path: config_path)
       port ||= Takagi.config.port
       processes = Takagi.config.processes
       threads = Takagi.config.threads
-      Takagi::Server.new(port: port, worker_processes: processes, worker_threads: threads).run!
+
+      protos = if protocols
+                 Array(protocols)
+               elsif protocol
+                 Array(protocol)
+               else
+                 Takagi.config.protocols
+               end.map(&:to_sym)
+
+      servers = protos.map do |proto|
+        case proto
+        when :tcp
+          Takagi::Server::Tcp.new(port: port, worker_threads: threads)
+        else
+          Takagi::Server::Udp.new(port: port, worker_processes: processes, worker_threads: threads)
+        end
+      end
+
+      if servers.length == 1
+        servers.first.run!
+      else
+        Takagi::Server::Multi.new(servers).run!
+      end
     end
 
-    def self.spawn!(port: 5683)
-      server = Takagi::Server.new(port: port)
-      Thread.new { server.run! }
-      server
+    def self.spawn!(port: 5683, protocols: nil, protocol: :udp)
+      protos = if protocols
+                 Array(protocols)
+               elsif protocol
+                 Array(protocol)
+               else
+                 Takagi.config.protocols
+               end.map(&:to_sym)
+
+      servers = protos.map do |proto|
+        proto == :tcp ? Takagi::Server::Tcp.new(port: port) : Takagi::Server::Udp.new(port: port)
+      end
+
+      if servers.length == 1
+        Thread.new { servers.first.run! }
+        servers.first
+      else
+        multi = Takagi::Server::Multi.new(servers)
+        Thread.new { multi.run! }
+        multi
+      end
     end
 
     def self.router

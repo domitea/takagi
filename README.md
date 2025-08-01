@@ -8,8 +8,9 @@
 **Takagi** is a **Sinatra-like CoAP framework** for IoT and microservices in Ruby.  
 It provides a lightweight way to build **CoAP APIs**, handle **IoT messaging**, and process sensor data efficiently.
 
-🔹 **Minimalistic DSL** – Define CoAP endpoints just like in Sinatra.  
+🔹 **Minimalistic DSL** – Define CoAP endpoints just like in Sinatra.
 🔹 **Efficient and fast** – Runs over UDP, ideal for IoT applications.
+🔹 **Reliable transport** – Supports CoAP over TCP (RFC 8323).
 
 ## Why "Takagi"?
 The name **Takagi** is inspired by **Riyoko Takagi**, as a nod to the naming convention of Sinatra.
@@ -51,6 +52,16 @@ class SensorAPI < Takagi::Base
 end
 
 SensorAPI.run!
+# To serve CoAP over TCP instead of UDP:
+# SensorAPI.run!(protocols: [:tcp])
+# To serve both TCP and UDP simultaneously:
+# SensorAPI.run!(protocols: [:udp, :tcp])
+```
+To perform requests over TCP you can use the built-in `TcpClient`:
+
+```ruby
+client = Takagi::TcpClient.new('coap+tcp://localhost:5683')
+client.get('/ping') { |resp| puts Takagi::Message::Inbound.new(resp).payload }
 ```
 🔥 **Boom! You just built a CoAP API in Ruby.**
 
