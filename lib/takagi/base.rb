@@ -13,7 +13,7 @@ module Takagi
       Takagi::Initializer.run!
     end
 
-    def self.run!(port: nil, config_path: 'config/takagi.yml', protocols: nil, protocol: :udp)
+    def self.run!(port: nil, config_path: 'config/takagi.yml', protocols: nil)
       boot!(config_path: config_path)
       port ||= Takagi.config.port
       processes = Takagi.config.processes
@@ -21,8 +21,6 @@ module Takagi
 
       protos = if protocols
                  Array(protocols)
-               elsif protocol
-                 Array(protocol)
                else
                  Takagi.config.protocols
                end.map(&:to_sym)
@@ -43,11 +41,9 @@ module Takagi
       end
     end
 
-    def self.spawn!(port: 5683, protocols: nil, protocol: :udp)
+    def self.spawn!(port: 5683, protocols: nil)
       protos = if protocols
                  Array(protocols)
-               elsif protocol
-                 Array(protocol)
                else
                  Takagi.config.protocols
                end.map(&:to_sym)
