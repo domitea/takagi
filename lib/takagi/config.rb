@@ -6,7 +6,7 @@
 
   module Takagi
     class Config
-      attr_accessor :port, :logger, :observability, :auto_migrate, :custom, :processes, :threads
+      attr_accessor :port, :logger, :observability, :auto_migrate, :custom, :processes, :threads, :protocols
 
       def initialize
         @port = 5683
@@ -14,6 +14,7 @@
         @auto_migrate = true
         @threads = 1
         @processes = 1
+        @protocols = [:udp]
         @observability = OpenStruct.new(backends: [:memory])
         @custom = {}
       end
@@ -49,6 +50,7 @@
         @logger = Logger.new() if data['logger']
         @processes = data['process'] if data['process']
         @threads = data['threads'] if data['threads']
+        @protocols = data['protocols'].map(&:to_sym) if data['protocols']
         if data['observability']
           @observability.backends = data['observability']['backends'].map(&:to_sym)
         end

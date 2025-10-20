@@ -12,7 +12,7 @@ module Takagi
         delete: 4
       }.freeze
 
-      def initialize(method:, uri:, token: nil, observe: nil, payload: nil, message_id: nil)
+      def initialize(method:, uri:, payload: nil, token: nil, observe: nil, message_id: nil)
         super()
         @method = method
         @uri = uri
@@ -20,6 +20,7 @@ module Takagi
         @observe = observe
         @payload = payload
         @message_id = message_id || rand(0..0xFFFF)
+        @payload = payload
       end
 
       def to_bytes
@@ -32,11 +33,14 @@ module Takagi
 
         options = encode_options
         token_part = @token.b
-        payload_part = if @payload.nil? || @payload.empty?
+        payload_part = if @payload.nil? || @payload == ''
                          ''.b
+                       elsif @payload.is_a?(String)
+                         "\xFF".b + @payload.b
                        else
-                         "\xFF".b + @payload.to_s.b
+                         "\xFF".b + @payload.to_json.b
                        end
+
         packet = (header + token_part + options + payload_part).b
 
         Takagi.logger.debug "Generated Request packet: #{packet.inspect}"

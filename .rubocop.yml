@@ -14,6 +14,7 @@ Style/Documentation:
     - 'lib/takagi/middleware/**/*'
     - 'lib/takagi/router.rb'
     - 'lib/takagi/server.rb'
+    - 'lib/takagi/server/**/*'
     - 'lib/takagi/logger.rb'
     - 'spec/**/*'
 
