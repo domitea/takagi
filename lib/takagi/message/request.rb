@@ -18,6 +18,7 @@ module Takagi
         @uri = uri
         @token = token || SecureRandom.hex(4)
         @observe = observe
+        @payload = payload
         @message_id = message_id || rand(0..0xFFFF)
         @payload = payload
       end
