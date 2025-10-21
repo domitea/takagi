@@ -2,6 +2,7 @@
 
 module Takagi
   module Observer
+    # Dispatches outbound notifications to subscribed observers.
     class Sender
       def initialize
         @sender = Takagi::Network::UdpSender.instance
@@ -17,7 +18,7 @@ module Takagi
         )
 
         @sender.transmit(message, subscriber[:address], subscriber[:port])
-      rescue => e
+      rescue StandardError => e
         Takagi.logger.error "Observer Notify Error: #{e.message}"
       end
     end

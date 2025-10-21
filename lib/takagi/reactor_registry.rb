@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Takagi
+  # Tracks background reactor instances and controls their lifecycle.
   module ReactorRegistry
     @reactors = []
 

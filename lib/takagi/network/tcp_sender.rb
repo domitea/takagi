@@ -5,6 +5,7 @@ require 'singleton'
 
 module Takagi
   module Network
+    # Sends CoAP responses to TCP clients with framing.
     class TcpSender
       include Singleton
 

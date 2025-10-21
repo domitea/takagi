@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Takagi
+  # Coordinates local observables and remote observe subscriptions.
   class Reactor
     def initialize
       @observables = {}
@@ -23,12 +24,13 @@ module Takagi
 
       Takagi.logger.debug "Subscribing #{path} with fake subscriber"
 
-      Takagi::ObserveRegistry.subscribe(path, {
+      Takagi::ObserveRegistry.subscribe(
+        path,
         address: parsed.host,
         port: parsed.port || 5683,
         token: SecureRandom.hex(2),
         handler: block
-      })
+      )
 
       client = Takagi::Observer::Client.new(uri)
       client.on_notify(&block)

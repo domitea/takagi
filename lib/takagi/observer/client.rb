@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
+require 'uri'
+require 'socket'
+require 'securerandom'
+
 module Takagi
   module Observer
+    # Lightweight CoAP observe client for integration testing.
     class Client
       def initialize(uri)
         @uri = URI.parse(uri)
@@ -37,26 +42,24 @@ module Takagi
       end
 
       def listen_for_notifications
-      @running = true
-      @thread = Thread.new do
-        while @running
-          begin
-            data, _addr = @socket.recvfrom_nonblock(1024)
-            inbound = Takagi::Message::Inbound.new(data)
-            next unless inbound.token == @token
-
-            payload = inbound.payload
-            Takagi.logger.info "Received notify: #{payload}"
-            @on_notify&.call(payload, inbound)
-          rescue IO::WaitReadable
-            @socket.wait_readable
-            retry
-          rescue IOError
-            break
-          end
-        end
+        @running = true
+        @thread = Thread.new { handle_notification_iteration while @running }
       end
-    end
+
+      def handle_notification_iteration
+        data, _addr = @socket.recvfrom_nonblock(1024)
+        inbound = Takagi::Message::Inbound.new(data)
+        return unless inbound.token == @token
+
+        payload = inbound.payload
+        Takagi.logger.info "Received notify: #{payload}"
+        @on_notify&.call(payload, inbound)
+      rescue IO::WaitReadable
+        @socket.wait_readable
+        retry
+      rescue IOError
+        @running = false
+      end
     end
   end
 end

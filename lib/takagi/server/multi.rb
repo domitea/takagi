@@ -16,7 +16,7 @@ module Takagi
       end
 
       def shutdown!
-        @servers.each { |s| s.shutdown! }
+        @servers.each(&:shutdown!)
         @threads.each(&:join)
       end
     end

@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
+require 'singleton'
+
 module Takagi
   module Network
+    # Sends UDP responses over the shared socket configured at boot.
     class UdpSender
       include Singleton
       def setup(socket:)
