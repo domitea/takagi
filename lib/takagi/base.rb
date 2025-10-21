@@ -3,7 +3,7 @@
 require 'rack'
 require 'socket'
 require 'json'
-require 'takagi/server/multi'
+require_relative 'server/multi'
 
 module Takagi
   # Base class that every Takagi based app should use
@@ -48,29 +48,36 @@ module Takagi
     # Registers a GET route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.get(path, &block)
-      router.get(path, &block)
+    def self.get(path, metadata: {}, &block)
+      router.get(path, metadata: metadata, &block)
     end
 
     # Registers a POST route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.post(path, &block)
-      router.post(path, &block)
+    def self.post(path, metadata: {}, &block)
+      router.post(path, metadata: metadata, &block)
     end
 
     # Registers a PUT route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.put(path, &block)
-      router.put(path, &block)
+    def self.put(path, metadata: {}, &block)
+      router.put(path, metadata: metadata, &block)
     end
 
     # Registers a DELETE route in the global router
     # @param path [String] The URL path
     # @param block [Proc] The request handler
-    def self.delete(path, &block)
-      router.delete(path, &block)
+    def self.delete(path, metadata: {}, &block)
+      router.delete(path, metadata: metadata, &block)
+    end
+
+    # Registers an OBSERVE route in the global router
+    # @param path [String] The URL path
+    # @param block [Proc] The handler function
+    def self.observable(path, metadata: {}, &block)
+      router.observable(path, metadata: metadata, &block)
     end
 
     def self.call(request)
@@ -98,6 +105,21 @@ module Takagi
 
     def self.start_reactors
       Takagi::ReactorRegistry.start_all
+    end
+
+    get '/.well-known/core', metadata: {
+      rt: 'core.discovery',
+      if: 'core.rd',
+      ct: Takagi::Discovery::CoreLinkFormat::CONTENT_FORMAT,
+      discovery: true,
+      title: 'Resource Discovery'
+    } do |req|
+      payload = Takagi::Discovery::CoreLinkFormat.generate(router: router, request: req)
+      req.to_response(
+        '2.05 Content',
+        payload,
+        options: { 12 => Takagi::Discovery::CoreLinkFormat::CONTENT_FORMAT }
+      )
     end
 
     get '/ping' do # basic route for simple checking

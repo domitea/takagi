@@ -120,13 +120,26 @@ module Takagi
       end
 
       def store_option(options, option_number, value)
-        formatted = value.force_encoding('UTF-8')
-        if option_number == 11
-          options[11] ||= []
-          options[11] << formatted
+        formatted = coerce_option_value(value)
+
+        case option_number
+        when 11, 15
+          options[option_number] ||= []
+          options[option_number] << formatted
         else
-          options[option_number] = formatted
+          if options.key?(option_number)
+            options[option_number] = Array(options[option_number]) << formatted
+          else
+            options[option_number] = formatted
+          end
         end
+      end
+
+      def coerce_option_value(value)
+        ascii = value.dup.force_encoding('ASCII-8BIT')
+        return ascii.force_encoding('UTF-8') if ascii.valid_encoding?
+
+        ascii
       end
     end
   end

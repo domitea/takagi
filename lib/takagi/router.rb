@@ -5,6 +5,10 @@ require 'singleton'
 module Takagi
   class Router
     include Singleton
+    DEFAULT_CONTENT_FORMAT = 50
+
+    RouteEntry = Struct.new(:method, :path, :block, :metadata, keyword_init: true)
+
     def initialize
       @routes = {}
       @routes_mutex = Mutex.new # Protects route modifications in multithreaded environments
@@ -15,9 +19,10 @@ module Takagi
     # @param method [String] The HTTP method (GET, POST, etc.)
     # @param path [String] The URL path, can include dynamic segments like `:id`
     # @param block [Proc] The handler to be executed when the route is matched
-    def add_route(method, path, &block)
+    def add_route(method, path, metadata: {}, &block)
       @routes_mutex.synchronize do
-        @routes["#{method} #{path}"] = block
+        entry = build_route_entry(method, path, metadata, block)
+        @routes["#{method} #{path}"] = entry
         @logger.debug "Add new route: #{method} #{path}"
       end
     end
@@ -25,44 +30,45 @@ module Takagi
     # Registers a GET route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def get(path, &block)
-      add_route('GET', path, &block)
+    def get(path, metadata: {}, &block)
+      add_route('GET', path, metadata: metadata, &block)
     end
 
     # Registers a POST route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def post(path, &block)
-      add_route('POST', path, &block)
+    def post(path, metadata: {}, &block)
+      add_route('POST', path, metadata: metadata, &block)
     end
 
     # Registers a PUT route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def put(path, &block)
-      add_route('PUT', path, &block)
+    def put(path, metadata: {}, &block)
+      add_route('PUT', path, metadata: metadata, &block)
     end
 
     # Registers a DELETE route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def delete(path, &block)
-      add_route('DELETE', path, &block)
+    def delete(path, metadata: {}, &block)
+      add_route('DELETE', path, metadata: metadata, &block)
     end
 
     # Registers a OBSERVE route
     # @param path [String] The URL path
     # @param block [Proc] The handler function
-    def observable(path, &block)
-      add_route('OBSERVE', path, &block)
+    def observable(path, metadata: {}, &block)
+      observable_metadata = { obs: true, rt: 'core#observable', if: 'takagi.observe' }
+      add_route('OBSERVE', path, metadata: observable_metadata.merge(metadata), &block)
     end
 
     def all_routes
-      @routes.keys
+      @routes.values.map { |entry| "#{entry.method} #{entry.path}" }
     end
 
     def find_observable(path)
-      @routes.find { |key, _| key.start_with?('OBSERVE') && key.split.last == path }
+      @routes.values.find { |entry| entry.method == 'OBSERVE' && entry.path == path }
     end
 
     # Finds a registered route for a given method and path
@@ -73,25 +79,35 @@ module Takagi
       @routes_mutex.synchronize do
         @logger.debug "Routes: #{@routes.inspect}"
         @logger.debug "Looking for route: #{method} #{path}"
-        block = @routes["#{method} #{path}"]
+        entry = @routes["#{method} #{path}"]
         params = {}
 
-        if block
-          return ->(req) { block.arity == 1 ? block.call(req) : block.call }, params
+        if entry
+          return wrap_block(entry.block), params
         end
 
         @logger.debug '[Debug] Find dynamic route'
-        block, params = match_dynamic_route(method, path)
+        entry, params = match_dynamic_route(method, path)
 
-        if block
-          return ->(req) { block.arity == 1 ? block.call(req) : block.call }, params
+        if entry
+          return wrap_block(entry.block), params
         end
 
         [nil, {}]
       end
     end
 
+    def link_format_entries
+      @routes_mutex.synchronize do
+        @routes.values.reject { |entry| entry.metadata[:discovery] }.map(&:dup)
+      end
+    end
+
     private
+
+    def wrap_block(block)
+      ->(req) { block.arity == 1 ? block.call(req) : block.call }
+    end
 
     # Matches dynamic routes that contain parameters (e.g., `/users/:id`)
     # @param method [String] HTTP method
@@ -106,15 +122,16 @@ module Takagi
     end
 
     def locate_dynamic_route(method, path)
-      @routes.each do |route_key, block|
-        route_method, route_path = route_key.split(' ', 2)
+      @routes.each_value do |entry|
+        route_method = entry.method
+        route_path = entry.path
         next unless route_method == method
 
         params = extract_dynamic_params(route_path, path)
         next unless params
 
         @logger.debug "Match found! Params: #{params.inspect}"
-        return [block, params]
+        return [entry, params]
       end
       nil
     end
@@ -142,6 +159,27 @@ module Takagi
 
     def log_no_match(params, path)
       @logger.debug "No Match found! Params: #{params.inspect} to #{path}"
+    end
+
+    def build_route_entry(method, path, metadata, block)
+      RouteEntry.new(method: method, path: path, block: block, metadata: normalize_metadata(method, path, metadata))
+    end
+
+    def normalize_metadata(method, path, metadata)
+      normalized = (metadata || {}).transform_keys(&:to_sym)
+      normalized[:rt] ||= default_resource_type(method)
+      normalized[:if] ||= default_interface(method)
+      normalized[:ct] = DEFAULT_CONTENT_FORMAT unless normalized.key?(:ct)
+      normalized[:title] ||= "#{method} #{path}"
+      normalized
+    end
+
+    def default_resource_type(method)
+      method == 'OBSERVE' ? 'core#observable' : 'core#endpoint'
+    end
+
+    def default_interface(method)
+      method == 'OBSERVE' ? 'takagi.observe' : "takagi.#{method.downcase}"
     end
   end
 end

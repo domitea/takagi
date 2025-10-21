@@ -23,7 +23,7 @@ RSpec.configure do |config|
 
   Dir["#{File.dirname(__FILE__)}/**/*.rb"].each { |file| require file }
 
-  def send_coap_request(type, method, path, payload = nil, token: ''.b, message_id: rand(0..0xFFFF))
+  def send_coap_request(type, method, path, payload = nil, token: ''.b, message_id: rand(0..0xFFFF), query: nil, options: {})
     raise ArgumentError, 'CoAP tokens must be 8 bytes or fewer' if token.bytesize > 8
 
     type_code = case type
@@ -47,8 +47,8 @@ RSpec.configure do |config|
     version_type_token = (0b01 << 6) | (type_code << 4) | token_length
 
     header = [version_type_token, method_code, (message_id >> 8) & 0xFF, message_id & 0xFF].pack("C*")
-    options = encode_uri_path(path)
-    packet = header + token + options
+    option_entries = build_option_entries(path, query, options)
+    packet = header + token + encode_options(option_entries)
 
     if payload
       payload = payload.to_s.b
@@ -60,25 +60,74 @@ RSpec.configure do |config|
     response
   end
 
-  def encode_uri_path(path)
-    segments = path.split("/").reject(&:empty?)
+  def build_option_entries(path, query, options)
+    entries = []
+    path_segments = path.split('/').reject(&:empty?)
+    path_segments.each { |segment| entries << [11, segment] }
+
+    if query
+      queries = case query
+                when String then query.split('&')
+                when Hash
+                  query.flat_map { |key, value| Array(value).map { |val| "#{key}=#{val}" } }
+                else
+                  []
+                end
+      queries.each { |segment| entries << [15, segment] }
+    end
+
+    options.each do |number, value|
+      Array(value).each { |val| entries << [Integer(number), val] }
+    end
+
+    entries
+  end
+
+  def encode_options(entries)
     last_option_number = 0
-    encoded = "".b
+    encoded = ''.b
 
-    segments.each do |segment|
-      option_number = 11 # Uri-Path
-      delta = option_number - last_option_number
-      length = segment.bytesize
+    entries.each_with_index.sort_by { |(number, _value), index| [number, index] }.each do |(number, value), _index|
+      encoded_value = case value
+                      when Integer
+                        encode_integer_option_value(value)
+                      else
+                        value.to_s.b
+                      end
 
-      raise "Segment too long" if length > 12 || delta > 12
+      delta = number - last_option_number
+      delta_nibble, delta_extension = encode_option_header_value(delta)
+      length_nibble, length_extension = encode_option_header_value(encoded_value.bytesize)
 
-      option_byte = (delta << 4) | length
+      option_byte = (delta_nibble << 4) | length_nibble
       encoded << option_byte.chr
-      encoded << segment
+      encoded << delta_extension if delta_extension
+      encoded << length_extension if length_extension
+      encoded << encoded_value
 
-      last_option_number = option_number
+      last_option_number = number
     end
 
     encoded
+  end
+
+  def encode_option_header_value(value)
+    case value
+    when 0..12
+      [value, nil]
+    when 13..268
+      [13, [value - 13].pack('C')]
+    when 269..65_804
+      [14, [value - 269].pack('n')]
+    else
+      raise ArgumentError, 'Option value too large'
+    end
+  end
+
+  def encode_integer_option_value(value)
+    return [value].pack('C') if value <= 0xFF
+    return [value].pack('n') if value <= 0xFFFF
+
+    [value].pack('N')
   end
 end
