@@ -23,32 +23,48 @@ module Takagi
       def to_bytes
         return ''.b unless @code
 
-        begin
-          @logger.debug "Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, \
-            message_id #{@message_id}, token #{@token.inspect}, type #{@type}"
-
-          version = 1
-          type = @type || 2 # Default ACK
-          token_length = @token.bytesize
-          version_type_token_length = ((version << 6) | (type << 4) | token_length)
-          header = [version_type_token_length, @code, @message_id].pack('CCn')
-
-          token_payload = @token.to_s.b
-          payload_part = if @payload.nil? || @payload.empty?
-                           ''.b
-                         else
-                           "\xFF".b + @payload.b
-                         end
-
-          packet = (header + token_payload + payload_part).b
-
-          @logger.debug "Final CoAP packet: #{packet.inspect}"
-
+        with_error_handling do
+          log_generation
+          packet = (build_header + token_bytes + build_payload_section).b
+          log_final_packet(packet)
           packet
-        rescue StandardError => e
-          @logger.error "To_bytes failed: #{e.message} at #{e.backtrace.first}"
-          ''.b
         end
+      end
+
+      private
+
+      def with_error_handling
+        yield
+      rescue StandardError => e
+        @logger.error "To_bytes failed: #{e.message} at #{e.backtrace.first}"
+        ''.b
+      end
+
+      def log_generation
+        @logger.debug "Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, " \
+                      "message_id #{@message_id}, token #{@token.inspect}, type #{@type}"
+      end
+
+      def build_header
+        version = 1
+        type = @type || 2 # Default ACK
+        token_length = @token.bytesize
+        version_type_token_length = (version << 6) | (type << 4) | token_length
+        [version_type_token_length, @code, @message_id].pack('CCn')
+      end
+
+      def token_bytes
+        @token.to_s.b
+      end
+
+      def build_payload_section
+        return ''.b if @payload.nil? || @payload.empty?
+
+        "\xFF".b + @payload.b
+      end
+
+      def log_final_packet(packet)
+        @logger.debug "Final CoAP packet: #{packet.inspect}"
       end
     end
   end

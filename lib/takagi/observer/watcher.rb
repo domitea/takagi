@@ -2,6 +2,7 @@
 
 module Takagi
   module Observer
+    # Periodically notifies observers by re-running registered handlers.
     class Watcher
       def initialize(interval: 1)
         @interval = interval
@@ -27,7 +28,7 @@ module Takagi
             sleep @interval
           end
           @thread
-        rescue => e
+        rescue StandardError => e
           Takagi.logger.error "Observer Watcher Error: #{e.message}"
         end
       end

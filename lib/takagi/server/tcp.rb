@@ -52,29 +52,44 @@ module Takagi
 
       def handle_connection(sock)
         loop do
-          len_bytes = sock.read(2)
-          break unless len_bytes
+          inbound_request = read_request(sock)
+          break unless inbound_request
 
-          length = len_bytes.unpack1('n')
-          data = sock.read(length)
-          break unless data
-
-          inbound_request = Takagi::Message::Inbound.new(data)
-          result = @middleware_stack.call(inbound_request)
-          response = if result.is_a?(Takagi::Message::Outbound)
-                       result
-                     elsif result.is_a?(Hash)
-                       inbound_request.to_response('2.05 Content', result)
-                     else
-                       inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
-                     end
-          bytes = response.to_bytes
-          sock.write([bytes.bytesize].pack('n') + bytes)
+          response = build_response(inbound_request)
+          transmit_response(sock, response)
         end
       rescue StandardError => e
         @logger.error "TCP handle_connection failed: #{e.message}"
       ensure
         sock.close
+      end
+
+      def read_request(sock)
+        len_bytes = sock.read(2)
+        return unless len_bytes
+
+        length = len_bytes.unpack1('n')
+        data = sock.read(length)
+        return unless data
+
+        Takagi::Message::Inbound.new(data)
+      end
+
+      def build_response(inbound_request)
+        result = @middleware_stack.call(inbound_request)
+        case result
+        when Takagi::Message::Outbound
+          result
+        when Hash
+          inbound_request.to_response('2.05 Content', result)
+        else
+          inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
+        end
+      end
+
+      def transmit_response(sock, response)
+        bytes = response.to_bytes
+        sock.write([bytes.bytesize].pack('n') + bytes)
       end
     end
   end

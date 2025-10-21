@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
+require 'securerandom'
+
 module Takagi
   module Message
-    # Class for request message that is coming from server to another server through observable
-
+    # Encodes outbound CoAP request envelopes used when observing remote peers.
     class Request < Base
       METHOD_CODES = {
         get: 1,
@@ -12,14 +13,13 @@ module Takagi
         delete: 4
       }.freeze
 
-      def initialize(method:, uri:, payload: nil, token: nil, observe: nil, message_id: nil)
+      def initialize(method:, uri:, payload: nil, token: nil, **options)
         super()
         @method = method
         @uri = uri
         @token = token || SecureRandom.hex(4)
-        @observe = observe
-        @payload = payload
-        @message_id = message_id || rand(0..0xFFFF)
+        @observe = options.fetch(:observe, nil)
+        @message_id = options.fetch(:message_id) { rand(0..0xFFFF) }
         @payload = payload
       end
 
@@ -84,7 +84,7 @@ module Takagi
           [val, '']
         when 13..268
           [13, [val - 13].pack('C')]
-        when 269..65804
+        when 269..65_804
           [14, [val - 269].pack('n')]
         else
           raise "Unsupported option delta/length: #{val}"

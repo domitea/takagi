@@ -28,9 +28,37 @@ RSpec.describe "Takagi RFC 7252 Compliance" do
     expect(response).to include("Hello")
   end
 
+  it "piggybacks ACK replies for confirmable requests and echoes the token" do
+    token = "\xAA\xBB".b
+    message_id = 0x4242
+
+    response = send_coap_request(:con, :get, "/ping", nil, token: token, message_id: message_id)
+    parsed = Takagi::Message::Inbound.new(response)
+
+    expect(parsed.type).to eq(2) # ACK
+    expect(parsed.token).to eq(token)
+    expect(parsed.message_id).to eq(message_id)
+    expect(parsed.code).to eq(69) # 2.05 Content
+  end
+
+  it "returns NON responses for NON requests" do
+    response = send_coap_request(:non, :get, "/ping")
+    parsed = Takagi::Message::Inbound.new(response)
+
+    expect(parsed.type).to eq(1) # NON
+    expect(parsed.code).to eq(69)
+  end
+
   it "responds with correct error codes for unknown paths" do
-    response = send_coap_request(:con, :get, "/nonexistent")
-    expect(response.bytes[1]).to eq(132) # 4.04 Not Found
+    token = "\x10".b
+    message_id = 0x5151
+    response = send_coap_request(:con, :get, "/nonexistent", nil, token: token, message_id: message_id)
+    parsed = Takagi::Message::Inbound.new(response)
+
+    expect(parsed.code).to eq(132) # 4.04 Not Found
+    expect(parsed.token).to eq(token)
+    expect(parsed.type).to eq(2) # ACK for CON request
+    expect(parsed.message_id).to eq(message_id)
   end
 
   it "uses unique message IDs and detects duplicates" do

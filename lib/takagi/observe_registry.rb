@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Takagi
+  # Keeps track of observers and broadcasts state changes to interested parties.
   class ObserveRegistry
     @subscriptions = {}
 
@@ -19,36 +20,51 @@ module Takagi
       end
 
       def notify(path, new_value)
-        return unless @subscriptions[path]
+        subscribers = @subscriptions[path]
+        return unless subscribers
 
         Takagi.logger.debug "Notify called for: #{path}"
         Takagi.logger.debug "Subscriptions: #{@subscriptions.inspect}"
 
-        @subscriptions[path].each do |sub|
-          should_notify = true
+        subscribers.each do |subscription|
+          next unless should_notify?(subscription, new_value)
 
-          if sub[:delta] && sub[:last_value]
-            delta_diff = (sub[:last_value] - new_value).abs rescue true
-            should_notify = delta_diff >= sub[:delta]
-          end
-
-          next unless should_notify
-
-          if sub[:handler]
-            Takagi.logger.debug "Calling local handler for #{path}"
-            sub[:handler].call(new_value, nil)
-          else
-            Takagi.logger.debug "Sending packet to #{sub[:address]}:#{sub[:port]}"
-            sender.send_packet(sub, new_value)
-          end
-
-          sub[:last_value] = new_value
-          sub[:last_seq] = (sub[:last_seq] || 0) + 1
+          deliver_notification(subscription, path, new_value)
+          update_sequence(subscription, new_value)
         end
       end
 
       def sender
         @sender ||= Takagi::Observer::Sender.new
+      end
+
+      private
+
+      def should_notify?(subscription, new_value)
+        return true unless subscription[:delta] && subscription[:last_value]
+
+        delta_exceeded?(subscription[:last_value], new_value, subscription[:delta])
+      end
+
+      def delta_exceeded?(last_value, new_value, threshold)
+        (last_value - new_value).abs >= threshold
+      rescue StandardError
+        true
+      end
+
+      def deliver_notification(subscription, path, new_value)
+        if subscription[:handler]
+          Takagi.logger.debug "Calling local handler for #{path}"
+          subscription[:handler].call(new_value, nil)
+        else
+          Takagi.logger.debug "Sending packet to #{subscription[:address]}:#{subscription[:port]}"
+          sender.send_packet(subscription, new_value)
+        end
+      end
+
+      def update_sequence(subscription, new_value)
+        subscription[:last_value] = new_value
+        subscription[:last_seq] = (subscription[:last_seq] || 0) + 1
       end
     end
   end

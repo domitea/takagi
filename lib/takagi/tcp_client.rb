@@ -4,6 +4,7 @@ require 'uri'
 require 'socket'
 
 module Takagi
+  # Minimal CoAP-over-TCP client used for smoke testing Takagi servers.
   class TcpClient
     attr_reader :server_uri, :timeout, :callbacks
 

@@ -15,30 +15,9 @@ module Takagi
 
     def self.run!(port: nil, config_path: 'config/takagi.yml', protocols: nil)
       boot!(config_path: config_path)
-      port ||= Takagi.config.port
-      processes = Takagi.config.processes
-      threads = Takagi.config.threads
-
-      protos = if protocols
-                 Array(protocols)
-               else
-                 Takagi.config.protocols
-               end.map(&:to_sym)
-
-      servers = protos.map do |proto|
-        case proto
-        when :tcp
-          Takagi::Server::Tcp.new(port: port, worker_threads: threads)
-        else
-          Takagi::Server::Udp.new(port: port, worker_processes: processes, worker_threads: threads)
-        end
-      end
-
-      if servers.length == 1
-        servers.first.run!
-      else
-        Takagi::Server::Multi.new(servers).run!
-      end
+      selected_port = port || Takagi.config.port
+      servers = build_servers(protocols || Takagi.config.protocols, selected_port)
+      run_servers(servers)
     end
 
     def self.spawn!(port: 5683, protocols: nil)
@@ -130,6 +109,33 @@ module Takagi
       { echo: body['message'] }
     rescue JSON::ParserError
       { error: 'Invalid JSON' }
+    end
+
+    class << self
+      private
+
+      def build_servers(protocols, port)
+        threads = Takagi.config.threads
+        processes = Takagi.config.processes
+        Array(protocols).map(&:to_sym).map do |protocol|
+          instantiate_server(protocol, port, threads: threads, processes: processes)
+        end
+      end
+
+      def instantiate_server(protocol, port, threads:, processes:)
+        case protocol
+        when :tcp
+          Takagi::Server::Tcp.new(port: port, worker_threads: threads)
+        else
+          Takagi::Server::Udp.new(port: port, worker_processes: processes, worker_threads: threads)
+        end
+      end
+
+      def run_servers(servers)
+        return servers.first.run! if servers.length == 1
+
+        Takagi::Server::Multi.new(servers).run!
+      end
     end
   end
 end

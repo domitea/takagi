@@ -11,7 +11,7 @@ module Takagi
         @method = coap_code_to_method(@code)
         @response_code = coap_code_to_method(@code) if @code >= 65 # Response
         @uri = parse_coap_uri
-        @logger.debug "CoAP Options: #{Thread.current[:options].inspect}"
+        @logger.debug "CoAP Options: #{@options.inspect}"
         @logger.debug "Parsed CoAP URI: #{@uri}"
       end
 
@@ -26,7 +26,7 @@ module Takagi
       end
 
       def parse_coap_uri
-        options = Thread.current[:options] || {}
+        options = @options || {}
         @logger.debug "Options received by parse_coap_uri: #{options.inspect}"
 
         host = options[3] || 'localhost'

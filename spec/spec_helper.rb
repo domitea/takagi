@@ -23,8 +23,8 @@ RSpec.configure do |config|
 
   Dir["#{File.dirname(__FILE__)}/**/*.rb"].each { |file| require file }
 
-  def send_coap_request(type, method, path, payload = nil)
-    message_id = rand(0..0xFFFF)
+  def send_coap_request(type, method, path, payload = nil, token: ''.b, message_id: rand(0..0xFFFF))
+    raise ArgumentError, 'CoAP tokens must be 8 bytes or fewer' if token.bytesize > 8
 
     type_code = case type
                 when :con then 0b00
@@ -42,7 +42,7 @@ RSpec.configure do |config|
                   else 0
                   end
 
-    token = ''.b
+    token = token.to_s.b
     token_length = token.bytesize
     version_type_token = (0b01 << 6) | (type_code << 4) | token_length
 
