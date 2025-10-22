@@ -2,6 +2,7 @@
 
 require 'singleton'
 require_relative 'core/attribute_set'
+require_relative 'helpers'
 
 module Takagi
   class Router
@@ -48,6 +49,8 @@ module Takagi
     # Provides the execution context for route handlers, exposing helper
     # methods for configuring CoRE Link Format attributes via a small DSL.
     class RouteContext
+      include Takagi::Helpers
+
       attr_reader :request, :params
 
       def initialize(entry, request, params, receiver)
@@ -73,7 +76,12 @@ module Takagi
                end
         args = [request, params] if block.arity.negative?
 
-        instance_exec(*args, &block)
+        # Support halt for early returns
+        result = catch(:halt) do
+          instance_exec(*args, &block)
+        end
+
+        result
       ensure
         @core_attributes.apply!
       end
@@ -147,6 +155,9 @@ module Takagi
         entry = build_route_entry(method, path, metadata, block)
         @routes["#{method} #{path}"] = entry
         @logger.debug "Add new route: #{method} #{path}"
+
+        # Extract metadata from core blocks inside the handler
+        extract_metadata_from_handler(entry) if block
       end
     end
 
@@ -337,6 +348,49 @@ module Takagi
 
     def default_interface(method)
       method == 'OBSERVE' ? 'takagi.observe' : "takagi.#{method.downcase}"
+    end
+
+    # Executes route handler in metadata extraction mode to capture core block attributes
+    # This allows defining metadata inline with the handler for better DX
+    def extract_metadata_from_handler(entry)
+      # Create a mock request object that will be passed to the handler
+      mock_request = MetadataExtractionRequest.new
+
+      # Create a route context to execute the handler and capture core attributes
+      context = RouteContext.new(entry, mock_request, {}, entry.receiver)
+
+      # Execute the handler block - it may call core { ... } which updates the attribute_set
+      begin
+        context.run(entry.block)
+      rescue ThreadError => e
+        # Deadlock can occur if handler tries to access routes (e.g., discovery endpoint)
+        # Skip metadata extraction in this case - these routes use metadata: {} instead
+        @logger.debug "Skipping metadata extraction for #{entry.method} #{entry.path}: #{e.message}"
+        return
+      rescue StandardError => e
+        # If the handler fails during metadata extraction (e.g., tries to access real data),
+        # that's okay - we only care about core blocks which should not throw errors
+        @logger.debug "Metadata extraction for #{entry.method} #{entry.path} encountered: #{e.message}"
+      end
+
+      # Apply any changes made by core blocks
+      entry.attribute_set.apply!
+    end
+
+    # Mock request object used during metadata extraction
+    # Provides minimal interface to prevent errors when handlers are executed at boot time
+    class MetadataExtractionRequest
+      def to_response(*_args)
+        nil # Ignore response generation during metadata extraction
+      end
+
+      def method_missing(_name, *_args, &_block)
+        nil # Return nil for any method calls to prevent errors
+      end
+
+      def respond_to_missing?(_name, _include_private = false)
+        true # Pretend to respond to everything
+      end
     end
   end
 end

@@ -73,7 +73,8 @@ module Takagi
       router.delete(path, metadata: metadata, &block)
     end
 
-    # Registers an OBSERVE route in the global router
+    # Registers an OBSERVE route in the global router (server-side)
+    # Use this to make a resource observable by clients
     # @param path [String] The URL path
     # @param block [Proc] The handler function
     def self.observable(path, metadata: {}, &block)
