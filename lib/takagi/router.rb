@@ -7,7 +7,90 @@ module Takagi
     include Singleton
     DEFAULT_CONTENT_FORMAT = 50
 
-    RouteEntry = Struct.new(:method, :path, :block, :metadata, keyword_init: true)
+    RouteEntry = Struct.new(:method, :path, :block, :metadata, :receiver, keyword_init: true)
+
+    # Provides the execution context for route handlers, exposing helper
+    # methods for configuring CoRE Link Format attributes via a small DSL.
+    class RouteContext
+      attr_reader :request, :params
+
+      def initialize(entry, request, params, receiver)
+        @entry = entry
+        @request = request
+        @params = params
+        @receiver = receiver
+        @core_attributes = Core::AttributeSet.new(@entry.metadata)
+      end
+
+      def metadata
+        @core_attributes.metadata
+      end
+
+      def run(block)
+        return unless block
+
+        args = case block.arity
+               when 0 then []
+               when 1 then [request]
+               else
+                 [request, params]
+               end
+        args = [request, params] if block.arity.negative?
+
+        instance_exec(*args, &block)
+      ensure
+        @core_attributes.apply!
+      end
+
+      def core(&block)
+        @core_attributes.core(&block)
+      end
+
+      def ct(value)
+        @core_attributes.ct(value)
+      end
+      alias content_format ct
+
+      def sz(value)
+        @core_attributes.sz(value)
+      end
+
+      def title(value)
+        @core_attributes.title(value)
+      end
+
+      def obs(value = true)
+        @core_attributes.obs(value)
+      end
+      alias observable obs
+
+      def rt(*values)
+        @core_attributes.rt(*values)
+      end
+
+      def interface(*values)
+        @core_attributes.interface(*values)
+      end
+      alias if_ interface
+
+      def attribute(name, value)
+        @core_attributes.attribute(name, value)
+      end
+
+      private
+
+      def method_missing(name, *args, &block)
+        if @receiver && @receiver.respond_to?(name)
+          @receiver.public_send(name, *args, &block)
+        else
+          super
+        end
+      end
+
+      def respond_to_missing?(name, include_private = false)
+        (@receiver && @receiver.respond_to?(name, include_private)) || super
+      end
+    end
 
     def initialize
       @routes = {}
@@ -83,14 +166,14 @@ module Takagi
         params = {}
 
         if entry
-          return wrap_block(entry.block), params
+          return wrap_block(entry), params
         end
 
         @logger.debug '[Debug] Find dynamic route'
         entry, params = match_dynamic_route(method, path)
 
         if entry
-          return wrap_block(entry.block), params
+          return wrap_block(entry), params
         end
 
         [nil, {}]
@@ -103,10 +186,32 @@ module Takagi
       end
     end
 
+    def configure_core(method, path, &block)
+      return unless block
+
+      @routes_mutex.synchronize do
+        entry = @routes["#{method} #{path}"]
+        unless entry
+          @logger.warn "configure_core skipped: #{method} #{path} not registered"
+          return
+        end
+
+        attributes = Core::AttributeSet.new(entry.metadata)
+        attributes.core(&block)
+        attributes.apply!
+      end
+    end
+
     private
 
-    def wrap_block(block)
-      ->(req) { block.arity == 1 ? block.call(req) : block.call }
+    def wrap_block(entry)
+      block = entry&.block
+      return nil unless block
+
+      ->(req, params = {}) do
+        context = RouteContext.new(entry, req, params, entry.receiver)
+        context.run(block)
+      end
     end
 
     # Matches dynamic routes that contain parameters (e.g., `/users/:id`)
@@ -162,7 +267,13 @@ module Takagi
     end
 
     def build_route_entry(method, path, metadata, block)
-      RouteEntry.new(method: method, path: path, block: block, metadata: normalize_metadata(method, path, metadata))
+      RouteEntry.new(
+        method: method,
+        path: path,
+        block: block,
+        metadata: normalize_metadata(method, path, metadata),
+        receiver: block&.binding&.receiver
+      )
     end
 
     def normalize_metadata(method, path, metadata)

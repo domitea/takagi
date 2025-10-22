@@ -8,16 +8,34 @@ RSpec.describe 'Takagi RFC 6690 Resource Discovery' do
     @previous_server_name = Takagi.config.server_name
     Takagi.config.server_name = 'Takagi Testbed'
 
-    Takagi::Base.get '/spec-temp', metadata: { rt: 'sensor.temp', if: 'core.s', title: 'Temperature' } do
+    Takagi::Base.get '/spec-temp' do
       { temp: 22.5 }
     end
 
-    Takagi::Base.observable '/spec-alerts', metadata: { title: 'Alerts', rt: 'sensor.alert' } do
+    Takagi::Base.core '/spec-temp' do
+      rt 'sensor.temp'
+      interface 'core.s'
+      title 'Temperature'
+    end
+
+    Takagi::Base.observable '/spec-alerts' do
       { alert: true }
     end
 
-    Takagi::Base.get '/spec-dump', metadata: { title: 'Dump', rt: 'sensor.dump', sz: 1024 } do
+    Takagi::Base.core '/spec-alerts', method: :observe do
+      title 'Alerts'
+      rt 'sensor.alert'
+    end
+
+    Takagi::Base.get '/spec-dump' do
       { dump: 'ok' }
+    end
+
+    Takagi::Base.core '/spec-dump' do
+      title 'Dump'
+      rt 'sensor.dump'
+      sz 1024
+      ct 'application/cbor'
     end
 
     port = find_free_port

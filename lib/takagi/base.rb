@@ -80,6 +80,10 @@ module Takagi
       router.observable(path, metadata: metadata, &block)
     end
 
+    def self.core(path, method: :get, &block)
+      router.configure_core(method.to_s.upcase, path, &block)
+    end
+
     def self.call(request)
       middleware_stack.call(request)
     end

@@ -124,7 +124,8 @@ module Takagi
             if: 'takagi.meta',
             ct: Takagi::Router::DEFAULT_CONTENT_FORMAT,
             title: name
-          }
+          },
+          receiver: nil
         )
       end
     end
