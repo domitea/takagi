@@ -3,13 +3,21 @@
 module Takagi
   module Middleware
     class Metrics
-      @@metrics = Hash.new(0)
+      attr_reader :metrics
+
+      def initialize
+        @metrics = Hash.new(0)
+        @mutex = Mutex.new
+      end
 
       def call(request)
-        @@metrics[:requests] += 1
+        @mutex.synchronize { @metrics[:requests] += 1 }
+
         start_time = Time.now
         response = yield request
-        @@metrics[:latency] = Time.now - start_time
+
+        @mutex.synchronize { @metrics[:latency] = Time.now - start_time }
+
         response
       end
     end

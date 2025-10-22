@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../response_builder'
+
 module Takagi
   module Server
     # Handles incoming UDP messages on behalf of the master Udp server.
@@ -97,16 +99,7 @@ module Takagi
       end
 
       def build_response(inbound_request, result)
-        case result
-        when Takagi::Message::Outbound
-          result
-        when Hash
-          @logger.debug "Returned #{result} as response"
-          inbound_request.to_response('2.05 Content', result)
-        else
-          @logger.warn "Middleware returned non-Hash: #{result.inspect}"
-          inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
-        end
+        ResponseBuilder.build(inbound_request, result, logger: @logger)
       end
 
       def transmit(response, addr)

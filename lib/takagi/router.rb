@@ -1,13 +1,49 @@
 # frozen_string_literal: true
 
 require 'singleton'
+require_relative 'core/attribute_set'
 
 module Takagi
   class Router
     include Singleton
     DEFAULT_CONTENT_FORMAT = 50
 
-    RouteEntry = Struct.new(:method, :path, :block, :metadata, :receiver, keyword_init: true)
+    # Represents a registered route with its handler and CoRE Link Format metadata
+    class RouteEntry
+      attr_reader :method, :path, :block, :receiver, :attribute_set
+
+      def initialize(method:, path:, block:, metadata: {}, receiver: nil)
+        @method = method
+        @path = path
+        @block = block
+        @receiver = receiver
+        @attribute_set = Core::AttributeSet.new(metadata)
+      end
+
+      # Returns the underlying metadata hash for backward compatibility
+      def metadata
+        @attribute_set.metadata
+      end
+
+      # Configure CoRE Link Format attributes using DSL block
+      #
+      # @example
+      #   entry.configure_attributes do
+      #     rt 'sensor'
+      #     obs true
+      #     ct 'application/json'
+      #   end
+      def configure_attributes(&block)
+        @attribute_set.core(&block)
+        @attribute_set.apply!
+      end
+
+      # Support for dup operation (used in discovery)
+      def initialize_copy(original)
+        super
+        @attribute_set = Core::AttributeSet.new(original.metadata.dup)
+      end
+    end
 
     # Provides the execution context for route handlers, exposing helper
     # methods for configuring CoRE Link Format attributes via a small DSL.
@@ -19,7 +55,7 @@ module Takagi
         @request = request
         @params = params
         @receiver = receiver
-        @core_attributes = Core::AttributeSet.new(@entry.metadata)
+        @core_attributes = @entry.attribute_set
       end
 
       def metadata
@@ -79,6 +115,9 @@ module Takagi
 
       private
 
+      # Delegates method calls to the receiver (application instance)
+      # This allows route handlers to call application methods within their blocks
+      # Example: get '/users' do; fetch_users; end - calls application's fetch_users method
       def method_missing(name, *args, &block)
         if @receiver && @receiver.respond_to?(name)
           @receiver.public_send(name, *args, &block)
@@ -87,6 +126,7 @@ module Takagi
         end
       end
 
+      # Required pair for method_missing to properly support respond_to?
       def respond_to_missing?(name, include_private = false)
         (@receiver && @receiver.respond_to?(name, include_private)) || super
       end
@@ -198,9 +238,7 @@ module Takagi
           return
         end
 
-        attributes = Core::AttributeSet.new(entry.metadata)
-        attributes.core(&block)
-        attributes.apply!
+        entry.configure_attributes(&block)
       end
     end
 
@@ -278,6 +316,12 @@ module Takagi
       )
     end
 
+    # Normalizes route metadata with sensible defaults for CoRE Link Format
+    #
+    # @param method [String] HTTP-like method (GET, POST, OBSERVE, etc.)
+    # @param path [String] Route path
+    # @param metadata [Hash, nil] User-provided metadata
+    # @return [Hash] Normalized metadata with defaults applied
     def normalize_metadata(method, path, metadata)
       normalized = (metadata || {}).transform_keys(&:to_sym)
       normalized[:rt] ||= default_resource_type(method)

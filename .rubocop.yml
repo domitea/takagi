@@ -7,7 +7,6 @@ AllCops:
     - 'spec/**/*'
     - 'node_modules/**/*'
     - 'vendor/**/*'
-    - 'lib/takagi/message_old.rb'
 
 Style/Documentation:
   Exclude:

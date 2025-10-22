@@ -4,27 +4,33 @@ module Takagi
   # Keeps track of observers and broadcasts state changes to interested parties.
   class ObserveRegistry
     @subscriptions = {}
+    @mutex = Mutex.new
 
     class << self
       attr_reader :subscriptions
 
       def subscribe(path, subscriber)
-        @subscriptions[path] ||= []
-        @subscriptions[path] << subscriber
+        @mutex.synchronize do
+          @subscriptions[path] ||= []
+          @subscriptions[path] << subscriber
+        end
       end
 
       def unsubscribe(path, token)
-        return unless @subscriptions[path]
+        @mutex.synchronize do
+          return unless @subscriptions[path]
 
-        @subscriptions[path].reject! { |s| s[:token] == token }
+          @subscriptions[path].reject! { |s| s[:token] == token }
+        end
       end
 
       def notify(path, new_value)
-        subscribers = @subscriptions[path]
+        # Get a snapshot of subscribers to avoid holding the lock during notification
+        subscribers = @mutex.synchronize { @subscriptions[path]&.dup }
         return unless subscribers
 
         Takagi.logger.debug "Notify called for: #{path}"
-        Takagi.logger.debug "Subscriptions: #{@subscriptions.inspect}"
+        Takagi.logger.debug "Subscriptions count: #{subscribers.size}"
 
         subscribers.each do |subscription|
           next unless should_notify?(subscription, new_value)

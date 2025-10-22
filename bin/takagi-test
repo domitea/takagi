@@ -6,6 +6,11 @@ require_relative "../lib/takagi"
 # Simple test app for debug and testing purposes.
 class TestApp < Takagi::Base
   get "/users/:id" do |params|
+    core do
+      title 'Users'
+      interface 'core.users'
+    end
+
     { received: params }
   end
 end

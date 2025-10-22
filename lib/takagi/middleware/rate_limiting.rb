@@ -3,12 +3,19 @@
 module Takagi
   module Middleware
     class RateLimiting
-      @@request_counts = Hash.new(0)
+      def initialize
+        @request_counts = Hash.new(0)
+        @mutex = Mutex.new
+      end
 
       def call(request)
         key = request.uri.path
-        @@request_counts[key] += 1
-        return request.to_response(code: 132, payload: { error: 'Too Many Requests' }) if @@request_counts[key] > 10
+
+        count = @mutex.synchronize do
+          @request_counts[key] += 1
+        end
+
+        return request.to_response(code: 132, payload: { error: 'Too Many Requests' }) if count > 10
 
         yield request
       end
