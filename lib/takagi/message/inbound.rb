@@ -15,14 +15,14 @@ module Takagi
         @logger.debug "Parsed CoAP URI: #{@uri}"
       end
 
-      def to_response(code, payload)
+      def to_response(code, payload, options: {})
         response_type = case @type
                         when 0 then 2  # CON → ACK
                         when 1 then 1  # NON → NON
                         else 3 # fallback → RST
                         end
 
-        Outbound.new(code: code, payload: payload, token: @token, message_id: @message_id, type: response_type)
+        Outbound.new(code: code, payload: payload, token: @token, message_id: @message_id, type: response_type, options: options)
       end
 
       def parse_coap_uri
@@ -31,9 +31,11 @@ module Takagi
 
         host = options[3] || 'localhost'
         path_segments = Array(options[11]).flatten
+        query_segments = Array(options[15]).flatten
 
         path = path_segments.empty? ? '/' : "/#{path_segments.join('/')}"
-        URI::Generic.build(scheme: 'coap', host: host, path: path)
+        query = query_segments.empty? ? nil : query_segments.join('&')
+        URI::Generic.build(scheme: 'coap', host: host, path: path, query: query)
       end
     end
   end

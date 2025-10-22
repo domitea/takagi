@@ -28,7 +28,7 @@ module Takagi
       app = lambda do |req|
         block, params = @router.find_route(req.method.to_s, req.uri.path)
         if block
-          block.arity == 2 ? block.call(req, params) : block.call(req)
+          block.call(req, params)
         else
           req.to_response('4.04 Not Found', { error: 'not found' })
         end

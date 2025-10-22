@@ -8,7 +8,8 @@ module Takagi
   class Config
     Observability = Struct.new(:backends, keyword_init: true)
 
-    attr_accessor :port, :logger, :observability, :auto_migrate, :custom, :processes, :threads, :protocols
+    attr_accessor :port, :logger, :observability, :auto_migrate, :custom, :processes, :threads, :protocols,
+                  :server_name
 
     def initialize
       @port = 5683
@@ -19,6 +20,7 @@ module Takagi
       @protocols = [:udp]
       @observability = Observability.new(backends: [:memory])
       @custom = {}
+      @server_name = nil
     end
 
     def [](key)
@@ -61,6 +63,7 @@ module Takagi
       @processes = data['process'] if data['process']
       @threads = data['threads'] if data['threads']
       @protocols = Array(data['protocols']).map(&:to_sym) if data['protocols']
+      @server_name = data['server_name'] if data['server_name']
     end
 
     def apply_logger(data)
