@@ -80,6 +80,8 @@ module Takagi
       router.observable(path, metadata: metadata, &block)
     end
 
+    # Configures CoRE Link Format metadata for an existing route. Handy when
+    # you want to declare handlers and metadata separately (e.g., during boot).
     def self.core(path, method: :get, &block)
       router.configure_core(method.to_s.upcase, path, &block)
     end

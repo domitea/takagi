@@ -3,6 +3,8 @@
 module Takagi
   module Core
     # Encapsulates CoRE Link Format attribute handling for a single route.
+    # The DSL is shared between request-time handlers and boot-time helpers,
+    # so changes applied here are idempotent and safe to call repeatedly.
     class AttributeSet
       CONTENT_FORMATS = {
         'text/plain' => 0,
@@ -23,6 +25,8 @@ module Takagi
         @overrides = {}
       end
 
+      # Evaluates a block that configures any mix of CoRE attributes.
+      # Accepts the same DSL as the runtime helpers exposed in RouteContext.
       def core(&block)
         instance_exec(&block) if block
       end
@@ -58,6 +62,9 @@ module Takagi
         metadata_override(name.to_sym, value.nil? ? REMOVE : value)
       end
 
+      # Persists staged attribute overrides back onto the route metadata.
+      # Invoked automatically after request handling, but also exposed so
+      # callers (e.g. Takagi::Router#configure_core) can persist updates.
       def apply!
         return if @overrides.empty?
 

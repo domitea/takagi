@@ -186,6 +186,8 @@ module Takagi
       end
     end
 
+    # Applies CoRE metadata outside the request cycle. Useful for boot time
+    # configuration where the DSL block does not have a live request object.
     def configure_core(method, path, &block)
       return unless block
 
