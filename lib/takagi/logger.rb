@@ -4,7 +4,7 @@ require 'logger'
 
 module Takagi
   class Logger
-    def initialize(log_output: $stdout, level: ::Logger::INFO)
+    def initialize(log_output: $stdout, level: ::Logger::DEBUG)
       @logger = ::Logger.new(log_output)
       @logger.level = level
     end

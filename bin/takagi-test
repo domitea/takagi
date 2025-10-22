@@ -3,10 +3,85 @@
 
 require_relative "../lib/takagi"
 
-# Simple test app for debug and testing purposes.
+# Simple test app demonstrating DX improvements
 class TestApp < Takagi::Base
-  get "/users/:id" do |params|
-    { received: params }
+  # Example 1: Using helper methods with inline core metadata
+  get "/users/:id" do
+    core do
+      title 'Users'
+      interface 'core.users'
+      rt 'user.resource'
+    end
+
+    # Auto-extraction of params - no need to specify in block args!
+    halt not_found("User #{params[:id]} not found") if params[:id].to_i > 100
+
+    # Clean response with json helper
+    json(
+      id: params[:id],
+      name: "User #{params[:id]}",
+      status: 'active'
+    )
+  end
+
+  # Example 2: Using validation helpers
+  post "/sensors" do
+    validate_params :temperature, :unit  # Raises if missing
+
+    created(
+      sensor_id: rand(1000),
+      temperature: params[:temperature],
+      unit: params[:unit]
+    )
+  end
+
+  # Example 3: Using request helpers
+  get "/data" do
+    if request.accept?('application/json')
+      json message: 'JSON format accepted'
+    else
+      { message: 'Default format' }
+    end
+  end
+
+  # Example 4: Query parameters
+  get "/search" do
+    query = request.query_params
+    json(
+      query: query,
+      results: []
+    )
+  end
+
+  # Example 5: Observable resources (server-side)
+  # Note: observable (not observe) is for server-side resources
+  # observe is for client-side subscriptions to remote resources
+  reactor do
+    observable "/sensor/temp" do
+      core do
+        rt 'sensor.temperature'
+        obs true
+      end
+
+      json temperature: 22.5 + rand(5), unit: 'celsius'
+    end
+  end
+
+  # Example 6: Status helpers
+  delete "/users/:id" do
+    # Simulate deletion
+    deleted message: "User #{params[:id]} deleted"
+  end
+
+  # Example 7: Error responses
+  get "/restricted" do
+    halt forbidden('Access denied') unless authorized?
+  end
+
+  private
+
+  def authorized?
+    false  # Demo only
   end
 end
 

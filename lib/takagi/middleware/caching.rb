@@ -3,13 +3,19 @@
 module Takagi
   module Middleware
     class Caching
-      @@cache = {}
+      def initialize
+        @cache = {}
+        @mutex = Mutex.new
+      end
 
       def call(request)
-        return @@cache[request.uri.path] if @@cache.key?(request.uri.path)
+        cached_response = @mutex.synchronize { @cache[request.uri.path] }
+        return cached_response if cached_response
 
         response = yield request
-        @@cache[request.uri.path] = response
+
+        @mutex.synchronize { @cache[request.uri.path] = response }
+
         response
       end
     end

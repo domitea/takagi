@@ -7,14 +7,15 @@ module Takagi
   module Server
     # UDP server for handling CoAP messages
     class Udp
-      def initialize(port: 5683, worker_processes: 2, worker_threads: 2)
+      def initialize(port: 5683, worker_processes: 2, worker_threads: 2,
+                     middleware_stack: nil, router: nil, logger: nil, watcher: nil)
         @port = port
         @worker_processes = worker_processes
         @worker_threads = worker_threads
-        @middleware_stack = Takagi::MiddlewareStack.instance
-        @router = Takagi::Router.instance
-        @logger = Takagi.logger
-        @watcher = Takagi::Observer::Watcher.new(interval: 1)
+        @middleware_stack = middleware_stack || Takagi::MiddlewareStack.instance
+        @router = router || Takagi::Router.instance
+        @logger = logger || Takagi.logger
+        @watcher = watcher || Takagi::Observer::Watcher.new(interval: 1)
 
         Initializer.run!
 

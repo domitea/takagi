@@ -1,17 +1,56 @@
 # frozen_string_literal: true
 
 require 'singleton'
+require_relative 'core/attribute_set'
+require_relative 'helpers'
 
 module Takagi
   class Router
     include Singleton
     DEFAULT_CONTENT_FORMAT = 50
 
-    RouteEntry = Struct.new(:method, :path, :block, :metadata, :receiver, keyword_init: true)
+    # Represents a registered route with its handler and CoRE Link Format metadata
+    class RouteEntry
+      attr_reader :method, :path, :block, :receiver, :attribute_set
+
+      def initialize(method:, path:, block:, metadata: {}, receiver: nil)
+        @method = method
+        @path = path
+        @block = block
+        @receiver = receiver
+        @attribute_set = Core::AttributeSet.new(metadata)
+      end
+
+      # Returns the underlying metadata hash for backward compatibility
+      def metadata
+        @attribute_set.metadata
+      end
+
+      # Configure CoRE Link Format attributes using DSL block
+      #
+      # @example
+      #   entry.configure_attributes do
+      #     rt 'sensor'
+      #     obs true
+      #     ct 'application/json'
+      #   end
+      def configure_attributes(&block)
+        @attribute_set.core(&block)
+        @attribute_set.apply!
+      end
+
+      # Support for dup operation (used in discovery)
+      def initialize_copy(original)
+        super
+        @attribute_set = Core::AttributeSet.new(original.metadata.dup)
+      end
+    end
 
     # Provides the execution context for route handlers, exposing helper
     # methods for configuring CoRE Link Format attributes via a small DSL.
     class RouteContext
+      include Takagi::Helpers
+
       attr_reader :request, :params
 
       def initialize(entry, request, params, receiver)
@@ -19,7 +58,9 @@ module Takagi
         @request = request
         @params = params
         @receiver = receiver
-        @core_attributes = Core::AttributeSet.new(@entry.metadata)
+        # Create a fresh AttributeSet for this request to avoid cross-request state sharing
+        # Initialize it with a copy of the entry's current metadata
+        @core_attributes = Core::AttributeSet.new(@entry.metadata.dup)
       end
 
       def metadata
@@ -37,7 +78,12 @@ module Takagi
                end
         args = [request, params] if block.arity.negative?
 
-        instance_exec(*args, &block)
+        # Support halt for early returns
+        result = catch(:halt) do
+          instance_exec(*args, &block)
+        end
+
+        result
       ensure
         @core_attributes.apply!
       end
@@ -79,16 +125,20 @@ module Takagi
 
       private
 
-      def method_missing(name, *args, &block)
-        if @receiver && @receiver.respond_to?(name)
-          @receiver.public_send(name, *args, &block)
+      # Delegates method calls to the receiver (application instance)
+      # This allows route handlers to call application methods within their blocks
+      # Example: get '/users' do; fetch_users; end - calls application's fetch_users method
+      def method_missing(name, ...)
+        if @receiver.respond_to?(name)
+          @receiver.public_send(name, ...)
         else
           super
         end
       end
 
+      # Required pair for method_missing to properly support respond_to?
       def respond_to_missing?(name, include_private = false)
-        (@receiver && @receiver.respond_to?(name, include_private)) || super
+        @receiver.respond_to?(name, include_private) || super
       end
     end
 
@@ -107,6 +157,9 @@ module Takagi
         entry = build_route_entry(method, path, metadata, block)
         @routes["#{method} #{path}"] = entry
         @logger.debug "Add new route: #{method} #{path}"
+
+        # Extract metadata from core blocks inside the handler
+        extract_metadata_from_handler(entry) if block
       end
     end
 
@@ -165,16 +218,12 @@ module Takagi
         entry = @routes["#{method} #{path}"]
         params = {}
 
-        if entry
-          return wrap_block(entry), params
-        end
+        return wrap_block(entry), params if entry
 
         @logger.debug '[Debug] Find dynamic route'
         entry, params = match_dynamic_route(method, path)
 
-        if entry
-          return wrap_block(entry), params
-        end
+        return wrap_block(entry), params if entry
 
         [nil, {}]
       end
@@ -198,9 +247,7 @@ module Takagi
           return
         end
 
-        attributes = Core::AttributeSet.new(entry.metadata)
-        attributes.core(&block)
-        attributes.apply!
+        entry.configure_attributes(&block)
       end
     end
 
@@ -210,7 +257,7 @@ module Takagi
       block = entry&.block
       return nil unless block
 
-      ->(req, params = {}) do
+      lambda do |req, params = {}|
         context = RouteContext.new(entry, req, params, entry.receiver)
         context.run(block)
       end
@@ -278,6 +325,12 @@ module Takagi
       )
     end
 
+    # Normalizes route metadata with sensible defaults for CoRE Link Format
+    #
+    # @param method [String] HTTP-like method (GET, POST, OBSERVE, etc.)
+    # @param path [String] Route path
+    # @param metadata [Hash, nil] User-provided metadata
+    # @return [Hash] Normalized metadata with defaults applied
     def normalize_metadata(method, path, metadata)
       normalized = (metadata || {}).transform_keys(&:to_sym)
       normalized[:rt] ||= default_resource_type(method)
@@ -293,6 +346,64 @@ module Takagi
 
     def default_interface(method)
       method == 'OBSERVE' ? 'takagi.observe' : "takagi.#{method.downcase}"
+    end
+
+    # Executes route handler in metadata extraction mode to capture core block attributes
+    # This allows defining metadata inline with the handler for better DX
+    def extract_metadata_from_handler(entry)
+      # Create a mock request object that will be passed to the handler
+      mock_request = MetadataExtractionRequest.new
+
+      # Create a special extraction context that uses the entry's AttributeSet directly
+      # (This is safe because it runs once at boot time, not during concurrent requests)
+      context = MetadataExtractionContext.new(entry, mock_request, {}, entry.receiver)
+
+      # Execute the handler block - it may call core { ... } which updates the attribute_set
+      begin
+        context.run(entry.block)
+      rescue ThreadError => e
+        # Deadlock can occur if handler tries to access routes (e.g., discovery endpoint)
+        # Skip metadata extraction in this case - these routes use metadata: {} instead
+        @logger.debug "Skipping metadata extraction for #{entry.method} #{entry.path}: #{e.message}"
+        return
+      rescue StandardError => e
+        # If the handler fails during metadata extraction (e.g., tries to access real data),
+        # that's okay - we only care about core blocks which should not throw errors
+        @logger.debug "Metadata extraction for #{entry.method} #{entry.path} encountered: #{e.message}"
+      end
+
+      # Apply any changes made by core blocks
+      entry.attribute_set.apply!
+    end
+
+    # Special context for boot-time metadata extraction
+    # Uses entry's AttributeSet directly (safe because boot-time is single-threaded)
+    class MetadataExtractionContext < RouteContext
+      def initialize(entry, request, params, receiver)
+        @entry = entry
+        @request = request
+        @params = params
+        @receiver = receiver
+        # Use entry's AttributeSet directly for boot-time extraction
+        # This is safe because metadata extraction runs once at boot time (single-threaded)
+        @core_attributes = @entry.attribute_set
+      end
+    end
+
+    # Mock request object used during metadata extraction
+    # Provides minimal interface to prevent errors when handlers are executed at boot time
+    class MetadataExtractionRequest
+      def to_response(*_args)
+        nil # Ignore response generation during metadata extraction
+      end
+
+      def method_missing(_name, *_args, &_block)
+        nil # Return nil for any method calls to prevent errors
+      end
+
+      def respond_to_missing?(_name, _include_private = false)
+        true # Pretend to respond to everything
+      end
     end
   end
 end

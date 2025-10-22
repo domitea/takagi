@@ -1,23 +1,25 @@
 # frozen_string_literal: true
 
 require 'socket'
+require_relative '../response_builder'
 
 module Takagi
   module Server
     # TCP server implementation for CoAP over TCP
     class Tcp
-      def initialize(port: 5683, worker_threads: 2)
+      def initialize(port: 5683, worker_threads: 2,
+                     middleware_stack: nil, router: nil, logger: nil, watcher: nil, sender: nil)
         @port = port
         @worker_threads = worker_threads
-        @middleware_stack = Takagi::MiddlewareStack.instance
-        @router = Takagi::Router.instance
-        @logger = Takagi.logger
-        @watcher = Takagi::Observer::Watcher.new(interval: 1)
+        @middleware_stack = middleware_stack || Takagi::MiddlewareStack.instance
+        @router = router || Takagi::Router.instance
+        @logger = logger || Takagi.logger
+        @watcher = watcher || Takagi::Observer::Watcher.new(interval: 1)
 
         Initializer.run!
 
         @server = TCPServer.new('0.0.0.0', @port)
-        @sender = Takagi::Network::TcpSender.instance
+        @sender = sender || Takagi::Network::TcpSender.instance
       end
 
       def run!
@@ -77,14 +79,7 @@ module Takagi
 
       def build_response(inbound_request)
         result = @middleware_stack.call(inbound_request)
-        case result
-        when Takagi::Message::Outbound
-          result
-        when Hash
-          inbound_request.to_response('2.05 Content', result)
-        else
-          inbound_request.to_response('5.00 Internal Server Error', { error: 'Internal Server Error' })
-        end
+        ResponseBuilder.build(inbound_request, result, logger: @logger)
       end
 
       def transmit_response(sock, response)
