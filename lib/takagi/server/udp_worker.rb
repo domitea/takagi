@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative '../response_builder'
+require_relative '../message/deduplication_cache'
 
 module Takagi
   module Server
@@ -13,6 +14,7 @@ module Takagi
         @logger = options.fetch(:logger)
         @port = options.fetch(:port)
         @threads = options.fetch(:threads)
+        @dedup_cache = Takagi::Message::DeduplicationCache.new
       end
 
       def run
@@ -49,12 +51,29 @@ module Takagi
         inbound_request = Takagi::Message::Inbound.new(request)
         log_inbound_request(inbound_request)
 
+        # RFC 7252 §4.4: Check for duplicate messages
+        source_endpoint = "#{addr[3]}:#{addr[1]}"
+        if inbound_request.type == 0 # CON message
+          cached_response = @dedup_cache.check_duplicate(inbound_request.message_id, source_endpoint)
+          if cached_response
+            @logger.debug "Duplicate CON detected (MID: #{inbound_request.message_id}), resending cached response"
+            return @sender.transmit(cached_response, addr[3], addr[1])
+          end
+        end
+
         immediate = immediate_response(inbound_request)
         return transmit(immediate, addr) if immediate
 
         result = @middleware_stack.call(inbound_request)
         log_middleware_result(result)
         response = build_response(inbound_request, result)
+
+        # Cache CON responses for duplicate detection
+        if inbound_request.type == 0 && response
+          response_data = response.to_bytes
+          @dedup_cache.store_response(inbound_request.message_id, source_endpoint, response_data)
+        end
+
         transmit(response, addr)
       rescue StandardError => e
         @logger.error "Handle_request failed: #{e.message}"

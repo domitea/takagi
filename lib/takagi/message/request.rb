@@ -6,6 +6,8 @@ module Takagi
   module Message
     # Encodes outbound CoAP request envelopes used when observing remote peers.
     class Request < Base
+      attr_reader :message_id
+
       METHOD_CODES = {
         get: 1,
         post: 2,
