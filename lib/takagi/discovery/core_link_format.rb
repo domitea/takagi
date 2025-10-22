@@ -48,25 +48,29 @@ module Takagi
 
       def matches_filter?(entry, key, values)
         case key
-        when 'rt'
-          Array(entry.metadata[:rt]).any? { |rt| values.include?(rt.to_s) }
-        when 'if'
-          Array(entry.metadata[:if]).any? { |iface| values.include?(iface.to_s) }
-        when 'ct'
-          values.any? { |val| entry.metadata[:ct].to_i == val.to_i }
-        when 'title'
-          title = entry.metadata[:title]
-          title && values.include?(title.to_s)
-        when 'sz'
-          size = entry.metadata[:sz]
-          size && values.any? { |val| size.to_i == val.to_i }
-        when 'obs'
-          entry.metadata[:obs]
-        when 'href'
-          values.any? { |val| entry.path == val }
-        else
-          false
+        when 'rt' then matches_list_attribute?(entry, :rt, values)
+        when 'if' then matches_list_attribute?(entry, :if, values)
+        when 'ct' then matches_numeric_attribute?(entry, :ct, values)
+        when 'title' then matches_string_attribute?(entry, :title, values)
+        when 'sz' then matches_numeric_attribute?(entry, :sz, values)
+        when 'obs' then entry.metadata[:obs]
+        when 'href' then values.any? { |val| entry.path == val }
+        else false
         end
+      end
+
+      def matches_list_attribute?(entry, attribute, values)
+        Array(entry.metadata[attribute]).any? { |item| values.include?(item.to_s) }
+      end
+
+      def matches_numeric_attribute?(entry, attribute, values)
+        metadata_value = entry.metadata[attribute]
+        metadata_value && values.any? { |val| metadata_value.to_i == val.to_i }
+      end
+
+      def matches_string_attribute?(entry, attribute, values)
+        metadata_value = entry.metadata[attribute]
+        metadata_value && values.include?(metadata_value.to_s)
       end
 
       def format_entry(entry)
@@ -75,7 +79,7 @@ module Takagi
       end
 
       def normalize_path(path)
-        path == '/' ? path : path
+        path
       end
 
       def link_attributes_for(entry)

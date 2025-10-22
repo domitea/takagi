@@ -128,11 +128,11 @@ module Takagi
           options[option_number] ||= []
           options[option_number] << formatted
         else
-          if options.key?(option_number)
-            options[option_number] = Array(options[option_number]) << formatted
-          else
-            options[option_number] = formatted
-          end
+          options[option_number] = if options.key?(option_number)
+                                     Array(options[option_number]) << formatted
+                                   else
+                                     formatted
+                                   end
         end
       end
 

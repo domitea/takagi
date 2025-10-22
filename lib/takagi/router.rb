@@ -58,7 +58,9 @@ module Takagi
         @request = request
         @params = params
         @receiver = receiver
-        @core_attributes = @entry.attribute_set
+        # Create a fresh AttributeSet for this request to avoid cross-request state sharing
+        # Initialize it with a copy of the entry's current metadata
+        @core_attributes = Core::AttributeSet.new(@entry.metadata.dup)
       end
 
       def metadata
@@ -126,9 +128,9 @@ module Takagi
       # Delegates method calls to the receiver (application instance)
       # This allows route handlers to call application methods within their blocks
       # Example: get '/users' do; fetch_users; end - calls application's fetch_users method
-      def method_missing(name, *args, &block)
-        if @receiver && @receiver.respond_to?(name)
-          @receiver.public_send(name, *args, &block)
+      def method_missing(name, ...)
+        if @receiver.respond_to?(name)
+          @receiver.public_send(name, ...)
         else
           super
         end
@@ -136,7 +138,7 @@ module Takagi
 
       # Required pair for method_missing to properly support respond_to?
       def respond_to_missing?(name, include_private = false)
-        (@receiver && @receiver.respond_to?(name, include_private)) || super
+        @receiver.respond_to?(name, include_private) || super
       end
     end
 
@@ -216,16 +218,12 @@ module Takagi
         entry = @routes["#{method} #{path}"]
         params = {}
 
-        if entry
-          return wrap_block(entry), params
-        end
+        return wrap_block(entry), params if entry
 
         @logger.debug '[Debug] Find dynamic route'
         entry, params = match_dynamic_route(method, path)
 
-        if entry
-          return wrap_block(entry), params
-        end
+        return wrap_block(entry), params if entry
 
         [nil, {}]
       end
@@ -259,7 +257,7 @@ module Takagi
       block = entry&.block
       return nil unless block
 
-      ->(req, params = {}) do
+      lambda do |req, params = {}|
         context = RouteContext.new(entry, req, params, entry.receiver)
         context.run(block)
       end
@@ -356,8 +354,9 @@ module Takagi
       # Create a mock request object that will be passed to the handler
       mock_request = MetadataExtractionRequest.new
 
-      # Create a route context to execute the handler and capture core attributes
-      context = RouteContext.new(entry, mock_request, {}, entry.receiver)
+      # Create a special extraction context that uses the entry's AttributeSet directly
+      # (This is safe because it runs once at boot time, not during concurrent requests)
+      context = MetadataExtractionContext.new(entry, mock_request, {}, entry.receiver)
 
       # Execute the handler block - it may call core { ... } which updates the attribute_set
       begin
@@ -375,6 +374,20 @@ module Takagi
 
       # Apply any changes made by core blocks
       entry.attribute_set.apply!
+    end
+
+    # Special context for boot-time metadata extraction
+    # Uses entry's AttributeSet directly (safe because boot-time is single-threaded)
+    class MetadataExtractionContext < RouteContext
+      def initialize(entry, request, params, receiver)
+        @entry = entry
+        @request = request
+        @params = params
+        @receiver = receiver
+        # Use entry's AttributeSet directly for boot-time extraction
+        # This is safe because metadata extraction runs once at boot time (single-threaded)
+        @core_attributes = @entry.attribute_set
+      end
     end
 
     # Mock request object used during metadata extraction
