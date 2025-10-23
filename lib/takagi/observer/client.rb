@@ -28,6 +28,7 @@ module Takagi
         @running = false
         @socket.close unless @socket.closed?
       end
+      alias close stop
 
       private
 

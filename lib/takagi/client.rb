@@ -1,23 +1,163 @@
 # frozen_string_literal: true
 
-require 'uri'
-require 'optparse'
 require 'socket'
+require_relative 'client_base'
 require_relative 'message/retransmission_manager'
 
 module Takagi
-  # Takagi Client: Client for communicating with the Takagi server over CoAP
-  class Client
+  # Unified Takagi Client for communicating with Takagi servers over CoAP.
+  #
+  # Supports multiple protocols (UDP, TCP) with automatic protocol detection
+  # based on URI scheme or explicit protocol parameter.
+  #
+  # @example Block-based with protocol auto-detection (recommended)
+  #   Takagi::Client.new('coap://localhost:5683') do |client|
+  #     client.get('/temperature')
+  #   end
+  #
+  # @example Block-based with explicit protocol
+  #   Takagi::Client.new('localhost:5683', protocol: :tcp) do |client|
+  #     client.get('/temperature')
+  #   end
+  #
+  # @example Manual lifecycle management
+  #   client = Takagi::Client.new('coap://localhost:5683')
+  #   begin
+  #     client.get('/temperature')
+  #   ensure
+  #     client.close
+  #   end
+  class Client < ClientBase
+    # Creates a new client and optionally yields it to a block.
+    #
+    # @param server_uri [String] URL of the Takagi server (e.g., 'coap://localhost:5683', 'localhost:5683')
+    # @param timeout [Integer] Maximum time to wait for a response
+    # @param protocol [Symbol, nil] Protocol to use (:udp, :tcp, or nil for auto-detection from URI)
+    # @param use_retransmission [Boolean] Enable RFC 7252 §4.2 compliant retransmission for UDP (default: true)
+    # @yield [client] Optionally yields the client to a block and auto-closes afterward
+    # @return [Client, Object] Returns the client instance, or the block's return value if a block is given
+    #
+    # @example Protocol auto-detection from URI
+    #   client = Takagi::Client.new('coap://localhost:5683')      # Uses UDP
+    #   client = Takagi::Client.new('coap+tcp://localhost:5683')  # Uses TCP
+    #
+    # @example Explicit protocol specification
+    #   client = Takagi::Client.new('localhost:5683', protocol: :tcp)
+    #   client = Takagi::Client.new('localhost:5683', protocol: :udp)
+    #
+    # @example With block (auto-close)
+    #   Takagi::Client.new('coap://localhost:5683') do |client|
+    #     client.get('/resource')
+    #   end
+    def initialize(server_uri, timeout: 5, protocol: nil, use_retransmission: true, &block)
+      # Detect protocol from URI if not explicitly specified
+      @protocol = protocol || detect_protocol(server_uri)
+
+      # Delegate to the appropriate client implementation
+      @impl = create_client_impl(server_uri, timeout, use_retransmission)
+
+      # If a block is given, yield and auto-close
+      return unless block_given?
+
+      begin
+        yield(self)
+      ensure
+        close
+      end
+    end
+
+    # Expose implementation attributes for delegation
     attr_reader :server_uri, :timeout, :callbacks
 
-    # Initializes the client
+    # Delegate server_uri to implementation
+    def server_uri
+      @impl&.server_uri
+    end
+
+    # Delegate timeout to implementation
+    def timeout
+      @impl&.timeout
+    end
+
+    # Delegate callbacks to implementation
+    def callbacks
+      @impl&.callbacks
+    end
+
+    # Delegate public ClientBase methods to implementation
+    %i[get post put delete on get_json post_json put_json].each do |method|
+      define_method(method) do |*args, &block|
+        @impl.public_send(method, *args, &block)
+      end
+    end
+
+    # Override close to delegate to implementation
+    def close
+      @impl&.close
+    end
+
+    # Override closed? to delegate to implementation
+    def closed?
+      @impl&.closed? || false
+    end
+
+    private
+
+    # Detects the protocol from the URI scheme
+    # @param uri_string [String] The URI to parse
+    # @return [Symbol] :tcp or :udp
+    def detect_protocol(uri_string)
+      uri = URI(uri_string.start_with?('coap') ? uri_string : "coap://#{uri_string}")
+      case uri.scheme
+      when 'coap+tcp', 'coaps+tcp'
+        :tcp
+      else
+        :udp
+      end
+    rescue URI::InvalidURIError
+      :udp # Default to UDP if URI parsing fails
+    end
+
+    # Creates the appropriate client implementation based on protocol
+    # @param server_uri [String] Server URI
+    # @param timeout [Integer] Request timeout
+    # @param use_retransmission [Boolean] Enable retransmission for UDP
+    # @return [UdpClient, TcpClient] The client implementation
+    def create_client_impl(server_uri, timeout, use_retransmission)
+      # Normalize URI to include scheme if not present
+      normalized_uri = normalize_uri(server_uri)
+
+      case @protocol
+      when :tcp
+        require_relative 'tcp_client'
+        TcpClient.new(normalized_uri, timeout: timeout)
+      when :udp
+        UdpClient.new(normalized_uri, timeout: timeout, use_retransmission: use_retransmission)
+      else
+        raise ArgumentError, "Unknown protocol: #{@protocol}. Use :udp or :tcp"
+      end
+    end
+
+    # Normalizes URI to include appropriate scheme
+    # @param uri_string [String] The URI string
+    # @return [String] Normalized URI with scheme
+    def normalize_uri(uri_string)
+      return uri_string if uri_string.start_with?('coap')
+
+      scheme = @protocol == :tcp ? 'coap+tcp' : 'coap'
+      "#{scheme}://#{uri_string}"
+    end
+  end
+
+  # UDP-specific client implementation (internal)
+  # Users should use Takagi::Client with protocol: :udp instead
+  class UdpClient < ClientBase
+    # Initializes the UDP client
     # @param server_uri [String] URL of the Takagi server
     # @param timeout [Integer] Maximum time to wait for a response
     # @param use_retransmission [Boolean] Enable RFC 7252 §4.2 compliant retransmission (default: true)
     def initialize(server_uri, timeout: 5, use_retransmission: true)
-      @server_uri = URI(server_uri)
-      @timeout = timeout
-      @callbacks = {}
+      super(server_uri, timeout: timeout)
       @use_retransmission = use_retransmission
 
       return unless @use_retransmission
@@ -26,49 +166,12 @@ module Takagi
       @retransmission_manager.start
     end
 
-    # Registers a callback for a given event
-    # @param event [Symbol] Event name (e.g., :response)
-    # @param callback [Proc] Callback function to handle the event
-    def on(event, &callback)
-      @callbacks[event] = callback
-    end
+    protected
 
-    # Sends a GET request
-    # @param path [String] Resource path
-    # @param callback [Proc] (optional) Callback function for processing the response
-    # Example CLI usage:
-    # ./takagi-client -s coap://localhost:5683 -m get -p /status
-    def get(path, &block)
-      request(:get, path, nil, &block)
-    end
-
-    # Sends a POST request
-    # @param path [String] Resource path
-    # @param payload [String] Data to send
-    # @param callback [Proc] (optional) Callback function for processing the response
-    # Example CLI usage:
-    # ./takagi-client -s coap://localhost:5683 -m post -p /data -d '{"value": 42}'
-    def post(path, payload, &block)
-      request(:post, path, payload, &block)
-    end
-
-    # Sends a PUT request
-    # @param path [String] Resource path
-    # @param payload [String] Data to send
-    # @param callback [Proc] (optional) Callback function for processing the response
-    # Example CLI usage:
-    # ./takagi-client -s coap://localhost:5683 -m put -p /config -d '{"setting": "on"}'
-    def put(path, payload, &block)
-      request(:put, path, payload, &block)
-    end
-
-    # Sends a DELETE request
-    # @param path [String] Resource path
-    # @param callback [Proc] (optional) Callback function for processing the response
-    # Example CLI usage:
-    # ./takagi-client -s coap://localhost:5683 -m delete -p /obsolete
-    def delete(path, &block)
-      request(:delete, path, nil, &block)
+    # Stops the retransmission manager thread
+    def cleanup_resources
+      @retransmission_manager&.stop
+      super
     end
 
     private
@@ -157,13 +260,6 @@ module Takagi
       else
         puts 'TakagiClient Error: Request timeout'
       end
-    end
-
-    def deliver_response(response_data, &callback)
-      return callback.call(response_data) if callback
-      return @callbacks[:response].call(response_data) if @callbacks[:response]
-
-      puts response_data
     end
   end
 end
