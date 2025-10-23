@@ -53,7 +53,7 @@ module Takagi
 
         # RFC 7252 §4.4: Check for duplicate messages
         source_endpoint = "#{addr[3]}:#{addr[1]}"
-        if inbound_request.type == 0 # CON message
+        if inbound_request.type.zero? # CON message
           cached_response = @dedup_cache.check_duplicate(inbound_request.message_id, source_endpoint)
           if cached_response
             @logger.debug "Duplicate CON detected (MID: #{inbound_request.message_id}), resending cached response"
@@ -69,7 +69,7 @@ module Takagi
         response = build_response(inbound_request, result)
 
         # Cache CON responses for duplicate detection
-        if inbound_request.type == 0 && response
+        if inbound_request.type.zero? && response
           response_data = response.to_bytes
           @dedup_cache.store_response(inbound_request.message_id, source_endpoint, response_data)
         end

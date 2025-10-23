@@ -49,7 +49,7 @@ module Takagi
     #   Takagi::Client.new('coap://localhost:5683') do |client|
     #     client.get('/resource')
     #   end
-    def initialize(server_uri, timeout: 5, protocol: nil, use_retransmission: true, &block)
+    def initialize(server_uri, timeout: 5, protocol: nil, use_retransmission: true)
       # Detect protocol from URI if not explicitly specified
       @protocol = protocol || detect_protocol(server_uri)
 
@@ -65,9 +65,6 @@ module Takagi
         close
       end
     end
-
-    # Expose implementation attributes for delegation
-    attr_reader :server_uri, :timeout, :callbacks
 
     # Delegate server_uri to implementation
     def server_uri

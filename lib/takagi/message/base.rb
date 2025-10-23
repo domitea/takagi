@@ -2,38 +2,6 @@
 
 module Takagi
   module Message
-    COAP_CODES = {
-      0 => 'EMPTY',
-      1 => 'GET',
-      2 => 'POST',
-      3 => 'PUT',
-      4 => 'DELETE',
-      65 => '2.01 Created',
-      66 => '2.02 Deleted',
-      67 => '2.03 Valid',
-      68 => '2.04 Changed',
-      69 => '2.05 Content',
-      128 => '4.00 Bad Request',
-      129 => '4.01 Unauthorized',
-      130 => '4.02 Bad Option',
-      131 => '4.03 Forbidden',
-      132 => '4.04 Not Found',
-      133 => '4.05 Method Not Allowed',
-      140 => '4.12 Precondition Failed',
-      141 => '4.13 Request Entity Too Large',
-      143 => '4.15 Unsupported Content Format',
-      160 => '5.00 Internal Server Error',
-      161 => '5.01 Not Implemented',
-      162 => '5.02 Bad Gateway',
-      163 => '5.03 Service Unavailable'
-    }.freeze
-
-    COAP_CODES_NUMBERS = {
-      '2.05' => 69,  # Content
-      '4.04' => 132, # Not Found
-      '5.00' => 160  # Internal Server Error
-    }.freeze
-
     # Base class for message
     class Base
       attr_reader :version, :type, :token, :message_id, :payload, :options, :code
@@ -44,16 +12,24 @@ module Takagi
         @logger = Takagi.logger
       end
 
+      # Convert CoAP code number to method name using registry
+      # @param code [Integer] CoAP code number
+      # @return [String] Method name (e.g., 'GET', 'OBSERVE')
       def coap_code_to_method(code)
-        if code == 1 && @options && @options[6]
+        # Check if it's an OBSERVE request (GET with Observe option)
+        if code == CoAP::Method::GET && @options && @options[CoAP::Option::OBSERVE]
           'OBSERVE'
         else
-          COAP_CODES[code] || 'UNKNOWN'
+          # Use CoAP registry to convert code to string
+          CoAP::CodeHelpers.to_string(code)
         end
       end
 
+      # Convert method name to CoAP code number using registry
+      # @param method [String, Symbol] Method name (e.g., 'GET', :post)
+      # @return [Integer] CoAP code number
       def coap_method_to_code(method)
-        COAP_CODES.key(method) || 0
+        CoAP::CodeHelpers.to_numeric(method)
       end
 
       private
@@ -123,8 +99,9 @@ module Takagi
       def store_option(options, option_number, value)
         formatted = coerce_option_value(value)
 
+        # Uri-Path (11) and Uri-Query (15) are always stored as arrays
         case option_number
-        when 11, 15
+        when CoAP::Option::URI_PATH, CoAP::Option::URI_QUERY
           options[option_number] ||= []
           options[option_number] << formatted
         else

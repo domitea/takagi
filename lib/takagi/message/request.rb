@@ -8,13 +8,6 @@ module Takagi
     class Request < Base
       attr_reader :message_id
 
-      METHOD_CODES = {
-        get: 1,
-        post: 2,
-        put: 3,
-        delete: 4
-      }.freeze
-
       def initialize(method:, uri:, payload: nil, token: nil, **options)
         super()
         @method = method
@@ -26,10 +19,11 @@ module Takagi
       end
 
       def to_bytes
-        version = 1
-        type = 0 # Confirmable
+        version = Takagi::CoAP::VERSION
+        type = CoAP::MessageType::CON # Confirmable
         token_length = @token.bytesize
-        code = METHOD_CODES[@method] || 0
+        # Use CoAP registry to convert method to code
+        code = CoAP::CodeHelpers.to_numeric(@method)
         ver_type_token = ((version << 6) | (type << 4) | token_length)
         header = [ver_type_token, code, @message_id].pack('CCn')
 
@@ -55,15 +49,16 @@ module Takagi
         last_option_number = 0
         encoded = []
 
-        # Observe musí jít jako PRVNÍ, aby delta vyšla správně
+        # Observe option must be first for correct delta encoding
         unless @observe.nil?
-          encoded << encode_option(6, [@observe].pack('C'), last_option_number)
-          last_option_number = 6
+          encoded << encode_option(CoAP::Option::OBSERVE, [@observe].pack('C'), last_option_number)
+          last_option_number = CoAP::Option::OBSERVE
         end
 
+        # Encode URI path segments
         @uri.path.split('/').reject(&:empty?).each do |segment|
-          encoded << encode_option(11, segment, last_option_number)
-          last_option_number = 11
+          encoded << encode_option(CoAP::Option::URI_PATH, segment, last_option_number)
+          last_option_number = CoAP::Option::URI_PATH
         end
 
         encoded.join.b

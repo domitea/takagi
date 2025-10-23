@@ -125,7 +125,7 @@ module Takagi
       req.to_response(
         '2.05 Content',
         payload,
-        options: { 12 => Takagi::Discovery::CoreLinkFormat::CONTENT_FORMAT }
+        options: { CoAP::Option::CONTENT_FORMAT => Takagi::Discovery::CoreLinkFormat::CONTENT_FORMAT }
       )
     end
 

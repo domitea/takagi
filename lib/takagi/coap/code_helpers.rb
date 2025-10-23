@@ -55,6 +55,7 @@ module Takagi
       # @example
       #   CodeHelpers.to_numeric(:get)       # => 1
       #   CodeHelpers.to_numeric("2.05")     # => 69
+      #   CodeHelpers.to_numeric("2.05 Content")   # => 69
       #   CodeHelpers.to_numeric(:content)   # => 69
       def self.to_numeric(code)
         case code
@@ -63,8 +64,9 @@ module Takagi
         when Symbol
           Method.value_for(code) || Response.value_for(code) || 0
         when String
-          if code =~ /^(\d)\.(\d{2})$/
-            string_to_numeric(code)
+          # Handle "2.05" or "2.05 Content" formats
+          if code =~ /^(\d)\.(\d{2})/
+            string_to_numeric("#{::Regexp.last_match(1)}.#{::Regexp.last_match(2)}")
           else
             Method.value_for(code.downcase.to_sym) ||
               Response.value_for(code.downcase.to_sym) ||
@@ -92,8 +94,8 @@ module Takagi
       def self.string_to_numeric(code_string)
         return 0 unless code_string =~ /^(\d)\.(\d{2})$/
 
-        class_num = $1.to_i
-        detail_num = $2.to_i
+        class_num = ::Regexp.last_match(1).to_i
+        detail_num = ::Regexp.last_match(2).to_i
         (class_num * 32) + detail_num
       end
 
@@ -157,7 +159,7 @@ module Takagi
       def self.code_type(code)
         if code < 32
           :method
-        elsif code >= 64 && code <= 191
+        elsif code.between?(64, 191)
           :response
         else
           :unknown

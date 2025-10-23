@@ -41,14 +41,14 @@ module Takagi
       # @param number [Integer] Option number
       # @return [Boolean] true if critical
       def self.critical?(number)
-        (number & 1) == 1
+        number.allbits?(1)
       end
 
       # Check if an option is unsafe to forward
       # @param number [Integer] Option number
       # @return [Boolean] true if unsafe
       def self.unsafe?(number)
-        (number & 2) == 2
+        number.allbits?(2)
       end
 
       # Check if an option has NoCacheKey property
@@ -62,7 +62,7 @@ module Takagi
       # @param number [Integer] Option number
       # @return [Boolean] true if valid
       def self.valid?(number)
-        number >= 0 && number <= 65535
+        number.between?(0, 65_535)
       end
     end
   end

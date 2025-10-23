@@ -84,7 +84,7 @@ module Takagi
       # @param code [Integer] Code to check
       # @return [Boolean] true if valid response code
       def self.valid?(code)
-        code >= 64 && code <= 191 && registered?(code)
+        code.between?(64, 191) && registered?(code)
       end
     end
   end

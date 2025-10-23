@@ -184,7 +184,7 @@ module Takagi
         return nil if value.nil?
 
         # Handle both array and non-array values
-        value = value.is_a?(Array) ? value.first : value
+        value = value.first if value.is_a?(Array)
 
         # Convert to integer (content-format is numeric)
         value.is_a?(String) ? decode_integer_value(value) : value

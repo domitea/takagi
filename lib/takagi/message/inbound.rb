@@ -9,7 +9,7 @@ module Takagi
       def initialize(data)
         super
         @method = coap_code_to_method(@code)
-        @response_code = coap_code_to_method(@code) if @code >= 65 # Response
+        @response_code = coap_code_to_method(@code) if @code >= CoAP::Response::CREATED # Response
         @uri = parse_coap_uri
         @logger.debug "CoAP Options: #{@options.inspect}"
         @logger.debug "Parsed CoAP URI: #{@uri}"
@@ -17,9 +17,9 @@ module Takagi
 
       def to_response(code, payload, options: {})
         response_type = case @type
-                        when 0 then 2  # CON → ACK
-                        when 1 then 1  # NON → NON
-                        else 3 # fallback → RST
+                        when CoAP::MessageType::CON then CoAP::MessageType::ACK  # CON → ACK
+                        when CoAP::MessageType::NON then CoAP::MessageType::NON  # NON → NON
+                        else CoAP::MessageType::RST # fallback → RST
                         end
 
         Outbound.new(code: code, payload: payload, token: @token, message_id: @message_id, type: response_type, options: options)
@@ -29,9 +29,9 @@ module Takagi
         options = @options || {}
         @logger.debug "Options received by parse_coap_uri: #{options.inspect}"
 
-        host = options[3] || 'localhost'
-        path_segments = Array(options[11]).flatten
-        query_segments = Array(options[15]).flatten
+        host = options[CoAP::Option::URI_HOST] || 'localhost'
+        path_segments = Array(options[CoAP::Option::URI_PATH]).flatten
+        query_segments = Array(options[CoAP::Option::URI_QUERY]).flatten
 
         path = path_segments.empty? ? '/' : "/#{path_segments.join('/')}"
         query = query_segments.empty? ? nil : query_segments.join('&')
@@ -54,10 +54,10 @@ module Takagi
         @options.key?(option_number)
       end
 
-      # Get Accept option (CoAP option 17)
+      # Get Accept option
       # @return [Integer, nil] The Accept content format
       def accept
-        option(17)
+        option(CoAP::Option::ACCEPT)
       end
 
       # Check if request accepts a specific content format
@@ -70,10 +70,10 @@ module Takagi
         accept == format_number
       end
 
-      # Get Content-Format option (CoAP option 12)
+      # Get Content-Format option
       # @return [Integer, nil] The Content-Format
       def content_format
-        option(12)
+        option(CoAP::Option::CONTENT_FORMAT)
       end
 
       # Get query parameters as a hash
@@ -119,15 +119,15 @@ module Takagi
 
       private
 
-      # Convert content format name to number
+      # Convert content format name to number using CoAP registry
       def content_format_to_number(format)
         formats = {
-          'text/plain' => 0,
-          'application/link-format' => 40,
-          'application/json' => 50,
-          'application/cbor' => 60
+          'text/plain' => CoAP::ContentFormat::TEXT_PLAIN,
+          'application/link-format' => CoAP::ContentFormat::LINK_FORMAT,
+          'application/json' => CoAP::ContentFormat::JSON,
+          'application/cbor' => CoAP::ContentFormat::CBOR
         }
-        formats[format.to_s.downcase] || 50
+        formats[format.to_s.downcase] || CoAP::ContentFormat::JSON
       end
     end
   end
