@@ -351,6 +351,15 @@ module Takagi
     # Executes route handler in metadata extraction mode to capture core block attributes
     # This allows defining metadata inline with the handler for better DX
     def extract_metadata_from_handler(entry)
+      # Skip metadata extraction for discovery routes to avoid deadlock
+      # Discovery routes access the router itself, which would cause a deadlock
+      # since we're already holding the routes_mutex. These routes declare
+      # their metadata explicitly via the metadata: parameter instead.
+      if entry.metadata[:discovery]
+        @logger.debug "Skipping metadata extraction for discovery route: #{entry.method} #{entry.path}"
+        return
+      end
+
       # Create a mock request object that will be passed to the handler
       mock_request = MetadataExtractionRequest.new
 
@@ -361,11 +370,6 @@ module Takagi
       # Execute the handler block - it may call core { ... } which updates the attribute_set
       begin
         context.run(entry.block)
-      rescue ThreadError => e
-        # Deadlock can occur if handler tries to access routes (e.g., discovery endpoint)
-        # Skip metadata extraction in this case - these routes use metadata: {} instead
-        @logger.debug "Skipping metadata extraction for #{entry.method} #{entry.path}: #{e.message}"
-        return
       rescue StandardError => e
         # If the handler fails during metadata extraction (e.g., tries to access real data),
         # that's okay - we only care about core blocks which should not throw errors

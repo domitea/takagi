@@ -15,6 +15,10 @@ module Takagi
   end
 
   loader = Zeitwerk::Loader.for_gem
+  # Configure inflector for CoAP (Constrained Application Protocol)
+  loader.inflector.inflect(
+    'coap' => 'CoAP'
+  )
   loader.setup
   loader.eager_load
 end

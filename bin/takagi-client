@@ -17,20 +17,22 @@ end.parse!
 
 # Ping request
 if options[:server] && options[:method] == "get" && options[:path] == "/ping"
-  client = Takagi::Client.new(options[:server], timeout: options[:timeout] || 5)
-  client.on(:response) do |response|
-    puts "[TakagiClient] Received response: #{response}"
+  Takagi::Client.new(options[:server], timeout: options[:timeout] || 5) do |client|
+    client.on(:response) do |response|
+      puts "[TakagiClient] Received response: #{response}"
+    end
+    client.send(:get, "/ping")  # Sends a ping request to the /ping route
+    sleep options[:timeout] || 5 # Wait for async response
   end
-  client.send(:get, "/ping")  # Sends a ping request to the /ping route
-  sleep options[:timeout] || 5 # Wait for async response
 elsif options[:server] && options[:method] && options[:path]
   # Handle other methods (POST, PUT, DELETE)
-  client = Takagi::Client.new(options[:server], timeout: options[:timeout] || 5)
-  client.on(:response) do |response|
-    puts "[TakagiClient] Received response: #{response}"
+  Takagi::Client.new(options[:server], timeout: options[:timeout] || 5) do |client|
+    client.on(:response) do |response|
+      puts "[TakagiClient] Received response: #{response}"
+    end
+    client.send(options[:method], options[:path], options[:data])
+    sleep options[:timeout] || 5 # Wait for async response
   end
-  client.send(options[:method], options[:path], options[:data])
-  sleep options[:timeout] || 5 # Wait for async response
 else
   puts "Missing required parameters. Use -h for help."
 end

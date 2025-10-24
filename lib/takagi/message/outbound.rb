@@ -4,7 +4,7 @@ module Takagi
   module Message
     # Class for outbound message that is coming from server
     class Outbound < Base
-      def initialize(code:, payload:, token: nil, message_id: nil, type: 1, options: {})
+      def initialize(code:, payload:, token: nil, message_id: nil, type: CoAP::MessageType::NON, options: {})
         super
         @code = coap_method_to_code(code)
         @token = token || ''.b
@@ -47,8 +47,8 @@ module Takagi
       end
 
       def build_header
-        version = 1
-        type = @type || 2 # Default ACK
+        version = Takagi::CoAP::VERSION
+        type = @type || CoAP::MessageType::ACK # Default ACK
         token_length = @token.bytesize
         version_type_token_length = (version << 6) | (type << 4) | token_length
         [version_type_token_length, @code, @message_id].pack('CCn')

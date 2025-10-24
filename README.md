@@ -88,12 +88,6 @@ SensorAPI.run!
 # To serve both TCP and UDP simultaneously:
 # SensorAPI.run!(protocols: [:udp, :tcp])
 ```
-To perform requests over TCP you can use the built-in `TcpClient`:
-
-```ruby
-client = Takagi::TcpClient.new('coap+tcp://localhost:5683')
-client.get('/ping') { |resp| puts Takagi::Message::Inbound.new(resp).payload }
-```
 🔥 **Boom! You just built a CoAP API in Ruby.**
 
 ### **Configure CoRE discovery metadata**
@@ -354,9 +348,126 @@ end
 
 ---
 
-## Sending Requests
+## Sending Requests (Client API)
 
-### **Using `coap-client`**
+Takagi provides a unified, Ruby-idiomatic client API for sending CoAP requests over both UDP and TCP.
+
+### **Unified Client with Auto-Cleanup**
+
+The client follows Ruby conventions (like `File.open`) with block-based initialization for automatic resource cleanup:
+
+```ruby
+# Block-based initialization (recommended - auto-cleanup)
+Takagi::Client.new('coap://localhost:5683') do |client|
+  client.get('/temperature')
+end # Automatically cleaned up
+
+# Or with TCP
+Takagi::Client.new('coap+tcp://localhost:5683') do |client|
+  client.get('/temperature')
+end
+
+# Explicit protocol selection
+Takagi::Client.new('localhost:5683', protocol: :tcp) do |client|
+  client.get('/temperature')
+end
+```
+
+### **Response Wrapper with Convenience Methods**
+
+Responses are wrapped with intuitive status checking methods:
+
+```ruby
+Takagi::Client.new('coap://localhost:5683') do |client|
+  client.get('/temperature') do |response|
+    if response.success?
+      puts "Temperature: #{response.payload}"
+      puts "Status: #{response.code_name}"  # "2.05 Content"
+    elsif response.not_found?
+      puts "Resource not found"
+    elsif response.error?
+      puts "Error: #{response.code_name}"
+    end
+  end
+end
+```
+
+**Available response methods:**
+- **Status checking:** `success?`, `error?`, `client_error?`, `server_error?`
+- **Specific codes:** `ok?`, `created?`, `deleted?`, `changed?`, `valid?`, `not_found?`, `bad_request?`, `unauthorized?`, `forbidden?`, `internal_server_error?`
+- **Data access:** `payload`, `code`, `code_name`, `options`, `token`
+- **JSON support:** `json`, `json?`, `content_format`
+
+### **JSON Convenience Methods**
+
+Simplified JSON handling with automatic encoding and decoding:
+
+```ruby
+Takagi::Client.new('coap://localhost:5683') do |client|
+  # Automatic JSON encoding
+  client.post_json('/data', {temp: 25, humidity: 60})
+
+  # Automatic JSON parsing
+  client.get_json('/data') do |data|
+    puts data['temp']  # Already parsed!
+  end
+
+  # Or check content type manually
+  client.get('/data') do |response|
+    if response.json?
+      data = response.json
+      puts data['temp']
+    end
+  end
+end
+```
+
+### **All HTTP-Like Methods**
+
+The client supports all standard CoAP methods:
+
+```ruby
+Takagi::Client.new('coap://localhost:5683') do |client|
+  # GET request
+  client.get('/sensor/1') do |response|
+    puts response.payload if response.success?
+  end
+
+  # POST request
+  client.post('/sensor', 'temperature=25') do |response|
+    puts "Created: #{response.created?}"
+  end
+
+  # PUT request
+  client.put('/sensor/1', 'temperature=26') do |response|
+    puts "Changed: #{response.changed?}"
+  end
+
+  # DELETE request
+  client.delete('/sensor/1') do |response|
+    puts "Deleted: #{response.deleted?}"
+  end
+end
+```
+
+### **Readable Default Output**
+
+Without a block, responses print human-readable output:
+
+```ruby
+Takagi::Client.new('coap://localhost:5683') do |client|
+  client.get('/resource')
+  # Prints: [2.05 Content] Hello World
+
+  client.get('/missing')
+  # Prints: [ERROR 4.04 Not Found] Resource not available
+end
+```
+
+### **Using `coap-client` CLI**
+
+For quick testing, you can also use the standard CoAP command-line tools:
+
 ```sh
 coap-client -m get coap://localhost:5683/sensor/1
 ```
@@ -366,11 +477,84 @@ coap-client -m post coap://localhost:5683/sensor -e '{"value":42}'
 
 ---
 
+## CoAP Protocol Registry System
+
+Takagi includes an extensible registry system for protocol constants, providing a plugin-friendly architecture where custom methods, response codes, options, and content formats can be registered.
+
+### **Using Protocol Constants**
+
+All CoAP constants are organized into registries that follow RFC specifications:
+
+```ruby
+# Method codes (RFC 7252 §12.1.1)
+Takagi::CoAP::Method::GET     # => 1
+Takagi::CoAP::Method::POST    # => 2
+
+# Response codes (RFC 7252 §12.1.2)
+Takagi::CoAP::Response::CONTENT     # => 69 (2.05)
+Takagi::CoAP::Response::NOT_FOUND   # => 132 (4.04)
+
+# Options (RFC 7252 §5.10)
+Takagi::CoAP::Option::URI_PATH         # => 11
+Takagi::CoAP::Option::CONTENT_FORMAT   # => 12
+
+# Content formats (RFC 7252 §12.3)
+Takagi::CoAP::ContentFormat::JSON        # => 50
+Takagi::CoAP::ContentFormat::TEXT_PLAIN  # => 0
+```
+
+### **Code Conversion Helpers**
+
+Convert between different representations easily:
+
+```ruby
+# Convert code to human-readable string
+Takagi::CoAP::CodeHelpers.to_string(69)      # => "2.05 Content"
+Takagi::CoAP::CodeHelpers.to_string(:get)    # => "GET"
+
+# Convert to numeric code
+Takagi::CoAP::CodeHelpers.to_numeric(:get)       # => 1
+Takagi::CoAP::CodeHelpers.to_numeric("2.05")     # => 69
+
+# Status checking
+Takagi::CoAP::Response.success?(69)        # => true (2.xx)
+Takagi::CoAP::Response.client_error?(132)  # => true (4.xx)
+```
+
+### **Plugin Development**
+
+Extend the protocol by registering new constants at runtime:
+
+```ruby
+# Register a custom method (RFC 8132 - FETCH)
+Takagi::CoAP::Method.register(5, 'FETCH', :fetch, rfc: 'RFC 8132 §2')
+
+# Now available as constant
+Takagi::CoAP::Method::FETCH  # => 5
+
+# Register custom response codes
+Takagi::CoAP::Response.register(231, '7.07 Custom Code', :custom_code)
+
+# Register custom options (e.g., for Block-Wise Transfer RFC 7959)
+Takagi::CoAP::Option.register(23, 'Block2', :block2, rfc: 'RFC 7959 §2.2')
+```
+
+**Benefits:**
+- Single source of truth for all CoAP constants
+- Plugin-friendly architecture for extending with new RFCs
+- Self-documenting code (no magic numbers)
+- RFC-aligned structure with inline documentation
+- Type-safe with validation methods
+
+---
+
 ## Features & Modules
+
+### Server Features
 
 | Feature                          | Description | Status |
 |----------------------------------|-------------|--------|
-| **CoAP API (RFC 7252)**          | Define REST-like CoAP routes | ✅ Ready |
+| **CoAP API (RFC 7252)**          | Define REST-like CoAP routes with Sinatra-like DSL | ✅ Ready |
 | **CoRE metadata DSL (RFC 6690)** | Describe discovery attributes inline or at boot | ✅ Ready |
 | **Observe (RFC 7641)**           | Offer server push and subscribe to remote feeds | ✅ Ready |
 | **CoAP over TCP (RFC 8323)**     | Reliable transport for constrained clients | ✅ Ready |
@@ -381,6 +565,27 @@ coap-client -m post coap://localhost:5683/sensor -e '{"value":42}'
 | **Validation Helpers**           | Validate params with `validate_params` | ✅ Ready |
 | **Early Returns**                | Use `halt` for cleaner control flow | ✅ Ready |
 | **Observable/Observe**           | Clear distinction: `observable` (server), `observe` (client) | ✅ Ready |
+
+### Client Features
+
+| Feature                          | Description | Status |
+|----------------------------------|-------------|--------|
+| **Unified Client API**           | Single interface for UDP and TCP with auto-protocol detection | ✅ Ready |
+| **Block-based Initialization**   | Auto-cleanup with Ruby-idiomatic block pattern | ✅ Ready |
+| **Response Wrapper**             | Convenient status checking with `success?`, `error?`, etc. | ✅ Ready |
+| **JSON Convenience Methods**     | Automatic JSON encoding/decoding with `post_json`, `get_json` | ✅ Ready |
+| **Readable Default Output**      | Human-readable response formatting by default | ✅ Ready |
+| **All CoAP Methods**             | Support for GET, POST, PUT, DELETE over UDP/TCP | ✅ Ready |
+
+### Protocol & Extension Features
+
+| Feature                          | Description | Status |
+|----------------------------------|-------------|--------|
+| **CoAP Registry System**         | Extensible registry for protocol constants | ✅ Ready |
+| **Protocol Constants**           | RFC-aligned constants for methods, responses, options | ✅ Ready |
+| **Code Helpers**                 | Convert between numeric codes and human-readable strings | ✅ Ready |
+| **Plugin Architecture**          | Register custom methods, options, and response codes | ✅ Ready |
+| **RFC Documentation**            | Inline RFC references for all constants | ✅ Ready |
 
 ---
 
