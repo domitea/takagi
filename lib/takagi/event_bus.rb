@@ -1,0 +1,431 @@
+# frozen_string_literal: true
+
+require 'securerandom'
+require_relative 'event_bus/address_prefix'
+require_relative 'event_bus/ractor_pool'
+require_relative 'event_bus/lru_cache'
+require_relative 'event_bus/future'
+require_relative 'event_bus/coap_bridge'
+require_relative 'event_bus/observer_cleanup'
+
+module Takagi
+  # High-level event distribution with Ractor-based async delivery.
+  # Built on top of ObserveRegistry with zero runtime dependencies.
+  #
+  # Supports both CoAP Observe style and Pub/Sub style APIs:
+  #
+  # @example CoAP Observe style
+  #   EventBus.observe('sensor.temperature.room1') { |msg| puts msg.body }
+  #   EventBus.notify('sensor.temperature.room1', { value: 25.5 })
+  #
+  # @example Pub/Sub style (aliases)
+  #   EventBus.consumer('sensor.temperature.room1') { |msg| puts msg.body }
+  #   EventBus.publish('sensor.temperature.room1', { value: 25.5 })
+  #
+  # @example Request-Reply pattern
+  #   reply = EventBus.send_sync('cache.query', { key: 'user:123' }, timeout: 1.0)
+  class EventBus # rubocop:disable Metrics/ClassLength
+    class Error < StandardError; end
+
+    # Event message wrapper (shareable for Ractor)
+    class Message
+      attr_reader :address, :body, :headers, :reply_address, :timestamp
+
+      def initialize(address, body, headers: {}, reply_address: nil)
+        @address = address.freeze
+        @body = deep_freeze(body)
+        @headers = deep_freeze(headers)
+        @reply_address = reply_address&.freeze
+        @timestamp = Time.now
+      end
+
+      # Reply to this message (request-reply pattern)
+      def reply(body, headers: {})
+        return unless @reply_address
+
+        EventBus.publish(@reply_address, body, headers: headers)
+      end
+
+      private
+
+      def deep_freeze(obj)
+        case obj
+        when Hash
+          obj.transform_keys(&:freeze).transform_values { |v| deep_freeze(v) }.freeze
+        when Array
+          obj.map { |v| deep_freeze(v) }.freeze
+        else
+          # String, Symbol, Numeric, TrueClass, FalseClass, NilClass, and others
+          obj.freeze
+        end
+      end
+    end
+
+    # Event handler wrapper
+    class Handler
+      attr_reader :address, :block, :options
+
+      def initialize(address, options = {}, &block)
+        @address = address
+        @block = block
+        @options = options
+        @local_only = options.fetch(:local_only, false)
+      end
+
+      def call(message)
+        @block.call(message)
+      rescue StandardError => e
+        if defined?(Takagi.logger)
+          Takagi.logger.error "Event handler error for #{@address}: #{e.message}"
+        else
+          warn "Event handler error for #{@address}: #{e.message}"
+        end
+      end
+
+      def local_only?
+        @local_only
+      end
+    end
+
+    # Class-level storage
+    @ractor_pool = EventBus::RactorPool.new(
+      ENV['EVENTBUS_RACTORS']&.to_i || 10
+    )
+    @handlers = Hash.new { |h, k| h[k] = [] } # address => [handlers]
+    @consumers = {} # consumer_id => Handler
+    @mutex = Mutex.new
+    @current_states = EventBus::LRUCache.new(
+      ENV['EVENTBUS_STATE_SIZE']&.to_i || 1000,
+      ENV['EVENTBUS_STATE_TTL']&.to_i || 3600
+    )
+    @cleanup = EventBus::ObserverCleanup.new(
+      interval: ENV['EVENTBUS_CLEANUP_INTERVAL']&.to_i || 60,
+      max_age: ENV['EVENTBUS_MAX_OBSERVER_AGE']&.to_i || 600
+    )
+    @last_index = {} # For round-robin selection
+
+    class << self
+      # ============================================
+      # PRIMARY API: Pub/Sub Pattern
+      # ============================================
+
+      # Publish message to all subscribers (pub/sub pattern)
+      # @param address [String] Event address (e.g., "sensor.temperature.room1")
+      # @param body [Object] Message body (must be shareable for Ractors)
+      # @param headers [Hash] Optional message headers
+      # @return [Message] Published message
+      #
+      # @example
+      #   EventBus.publish('sensor.temperature.room1', { value: 25.5, unit: 'C' })
+      def publish(address, body = nil, headers: {})
+        message = Message.new(address, body, headers: headers)
+
+        # ALWAYS deliver locally (fast in-memory)
+        @mutex.synchronize do
+          handlers_for(address).each do |handler|
+            deliver_async(handler, message)
+          end
+
+          # Wildcard handlers
+          wildcard_handlers(address).each do |handler|
+            deliver_async(handler, message)
+          end
+        end
+
+        # Automatic CoAP distribution (if distributed address)
+        if distributed?(address)
+          @current_states.set(address, message.body)
+          CoAPBridge.publish_to_observers(address, message)
+        end
+
+        message
+      end
+
+      # Send message to single consumer (point-to-point pattern)
+      # Uses round-robin if multiple consumers registered
+      # @param address [String] Event address
+      # @param body [Object] Message body
+      # @param headers [Hash] Optional headers
+      # @yield [reply_message] Optional reply handler (request-reply pattern)
+      # @return [Message] Sent message
+      #
+      # @example
+      #   EventBus.send('cache.query', { key: 'user:123' }) do |reply|
+      #     puts "Cache value: #{reply.body[:value]}"
+      #   end
+      def send(address, body = nil, headers: {}, &reply_handler)
+        reply_address = reply_handler ? generate_reply_address : nil
+
+        # Register temporary reply handler
+        if reply_handler
+          consumer(reply_address, local_only: true, &reply_handler)
+
+          # Auto-unregister after timeout
+          Thread.new do
+            sleep 30 # Reply timeout
+            unregister(reply_address)
+          end
+        end
+
+        message = Message.new(address, body, headers: headers, reply_address: reply_address)
+
+        @mutex.synchronize do
+          handler = next_handler_for(address)
+          deliver_async(handler, message) if handler
+        end
+
+        message
+      end
+
+      # Synchronous send with timeout (blocking)
+      # @param address [String] Event address
+      # @param body [Object] Message body
+      # @param headers [Hash] Optional headers
+      # @param timeout [Float] Timeout in seconds (default: 1.0)
+      # @return [Message] Reply message
+      # @raise [Timeout::Error] If no reply received within timeout
+      #
+      # @example
+      #   reply = EventBus.send_sync('cache.query', { key: 'user:123' }, timeout: 1.0)
+      #   puts "Cache hit: #{reply.body[:hit]}"
+      def send_sync(address, body = nil, headers: {}, timeout: 1.0)
+        future = Future.new
+
+        send(address, body, headers: headers) do |reply_message|
+          future.set_value(reply_message)
+        end
+
+        future.value(timeout: timeout)
+      rescue Timeout::Error
+        raise Error, "No reply received for #{address} within #{timeout}s"
+      end
+
+      # Asynchronous send with Future (non-blocking)
+      # @param address [String] Event address
+      # @param body [Object] Message body
+      # @param headers [Hash] Optional headers
+      # @return [Future] Future that will contain reply
+      #
+      # @example
+      #   future = EventBus.send_async('cache.query', { key: 'user:123' })
+      #   # ... do other work ...
+      #   reply = future.value(timeout: 1.0)
+      def send_async(address, body = nil, headers: {})
+        future = Future.new
+
+        send(address, body, headers: headers) do |reply_message|
+          future.set_value(reply_message)
+        end
+
+        future
+      end
+
+      # Register consumer for address (point-to-point or pub/sub)
+      # @param address [String] Event address or pattern
+      # @param options [Hash] Handler options
+      # @option options [Boolean] :local_only Only receive local messages
+      # @yield [message] Block called when message received
+      # @return [String] Consumer ID (for unregistering)
+      #
+      # @example
+      #   id = EventBus.consumer('sensor.temperature.room1') do |message|
+      #     puts "Temp: #{message.body[:value]}"
+      #   end
+      #   EventBus.unregister(id)
+      def consumer(address, options = {}, &block)
+        raise ArgumentError, 'Block required' unless block
+
+        handler = Handler.new(address, options, &block)
+        consumer_id = SecureRandom.uuid
+
+        @mutex.synchronize do
+          @handlers[address] << handler
+          @consumers[consumer_id] = handler
+        end
+
+        # Auto-create CoAP observable resource if distributed and not local_only
+        if distributed?(address) && !options[:local_only] && defined?(Takagi::Base)
+          CoAPBridge.register_observable_resource(address, Takagi::Base)
+        end
+
+        log_debug "Consumer registered: #{address} (#{consumer_id})"
+        consumer_id
+      end
+
+      # Unregister a consumer
+      # @param consumer_id [String] Consumer ID returned from consumer()
+      def unregister(consumer_id)
+        @mutex.synchronize do
+          handler = @consumers.delete(consumer_id)
+          return unless handler
+
+          @handlers[handler.address].delete(handler)
+          @handlers.delete(handler.address) if @handlers[handler.address].empty?
+        end
+
+        log_debug "Unregistered consumer: #{consumer_id}"
+      end
+
+      # Subscribe to remote CoAP observable
+      # @param address [String] Event address
+      # @param node_url [String] Remote node URL (e.g., 'coap://building-a:5683')
+      # @yield [message] Block called when remote notification received
+      # @return [String] Subscription ID
+      #
+      # @example
+      #   id = EventBus.subscribe_remote('sensor.temp.buildingA', 'coap://building-a:5683') do |msg|
+      #     puts "Remote temp: #{msg.body[:value]}"
+      #   end
+      def subscribe_remote(address, node_url, &block)
+        CoAPBridge.subscribe_remote(address, node_url, &block)
+      end
+
+      # ============================================
+      # ALIASES: CoAP Observe + EventEmitter Style
+      # ============================================
+
+      alias observe consumer           # CoAP Observe style
+      alias on consumer                # EventEmitter style
+      alias notify publish             # CoAP Observe style
+      alias emit publish               # EventEmitter style
+      alias cancel unregister          # CoAP Observe style
+      alias subscribe subscribe_remote # CoAP Observe style
+      alias unsubscribe unregister     # CoAP Observe style
+
+      # ============================================
+      # UTILITY METHODS
+      # ============================================
+
+      # Check if address is distributed via CoAP
+      # Uses AddressPrefix registry for extensibility
+      # @param address [String] Event address
+      # @return [Boolean]
+      def distributed?(address)
+        AddressPrefix.distributed?(address)
+      end
+
+      # Check if address is local-only
+      # Uses AddressPrefix registry for extensibility
+      # @param address [String] Event address
+      # @return [Boolean]
+      def local_only?(address)
+        AddressPrefix.local?(address)
+      end
+
+      # Get current state for address
+      # @param address [String] Event address
+      # @return [Object, nil] Current state or nil
+      def current_state(address)
+        @current_states.get(address)
+      end
+
+      # List all registered addresses
+      # @return [Array<String>] Event addresses
+      def addresses
+        @handlers.keys
+      end
+
+      # Get handler count for address
+      # @param address [String] Event address
+      # @return [Integer] Number of handlers
+      def handler_count(address)
+        @handlers[address]&.size || 0
+      end
+
+      # Get EventBus statistics
+      # @return [Hash] Statistics
+      def stats
+        {
+          consumers: @consumers.size,
+          addresses: @handlers.keys.size,
+          ractor_pool_size: @ractor_pool.size,
+          state_cache_size: @current_states.size,
+          distributed_addresses: addresses.select { |a| distributed?(a) }.size,
+          local_addresses: addresses.select { |a| local_only?(a) }.size
+        }
+      end
+
+      # Start background cleanup
+      def start_cleanup
+        @cleanup.start
+      end
+
+      # Stop background cleanup
+      def stop_cleanup
+        @cleanup.stop
+      end
+
+      # Shutdown EventBus (cleanup resources)
+      def shutdown
+        stop_cleanup
+        @ractor_pool.shutdown
+        @current_states.clear
+        @mutex.synchronize do
+          @handlers.clear
+          @consumers.clear
+        end
+      end
+
+      private
+
+      # Get all handlers for exact address match
+      def handlers_for(address)
+        @handlers[address] || []
+      end
+
+      # Get handlers matching wildcard patterns
+      # Supports: "sensor.*", "sensor.*.room1"
+      def wildcard_handlers(address)
+        matching = []
+        parts = address.split('.')
+
+        @handlers.each do |pattern, handlers|
+          next unless pattern.include?('*')
+
+          matching.concat(handlers) if match_pattern?(parts, pattern.split('.'))
+        end
+
+        matching
+      end
+
+      # Match address parts against pattern
+      def match_pattern?(parts, pattern_parts)
+        return false if pattern_parts.size != parts.size
+
+        parts.zip(pattern_parts).all? do |part, pattern|
+          pattern == '*' || pattern == part
+        end
+      end
+
+      # Round-robin selection of next handler
+      def next_handler_for(address)
+        handlers = handlers_for(address)
+        return nil if handlers.empty?
+
+        @last_index[address] ||= -1
+        @last_index[address] = (@last_index[address] + 1) % handlers.size
+
+        handlers[@last_index[address]]
+      end
+
+      # Deliver message asynchronously via Ractor pool
+      def deliver_async(handler, message)
+        @ractor_pool.post do
+          handler.call(message)
+        end
+      end
+
+      # Generate unique reply address
+      def generate_reply_address
+        "reply.#{SecureRandom.uuid}"
+      end
+
+      # Log debug message
+      def log_debug(message)
+        return unless defined?(Takagi.logger)
+
+        Takagi.logger.debug message
+      end
+    end
+  end
+end
