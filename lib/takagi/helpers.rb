@@ -2,124 +2,23 @@
 
 module Takagi
   # Helper methods for route handlers to improve DX
+  #
+  # Dynamically generates response helper methods from CoAP::Response registry:
+  # - Success methods (2.xx): created(data = {}), changed(data = {}), etc.
+  # - Error methods (4.xx, 5.xx): bad_request(message = ...), not_found(message = ...), etc.
+  #
+  # @example Success response
+  #   created({ id: 123, name: 'Resource' })
+  #
+  # @example Error response
+  #   bad_request('Invalid input')
+  #   unauthorized({ error: 'Token expired' })
   module Helpers
-    # CoAP response codes as constants for reference
-    module CoAPCodes
-      CREATED = '2.01'
-      DELETED = '2.02'
-      VALID = '2.03'
-      CHANGED = '2.04'
-      CONTENT = '2.05'
-      CONTINUE = '2.31'
-
-      BAD_REQUEST = '4.00'
-      UNAUTHORIZED = '4.01'
-      BAD_OPTION = '4.02'
-      FORBIDDEN = '4.03'
-      NOT_FOUND = '4.04'
-      METHOD_NOT_ALLOWED = '4.05'
-      NOT_ACCEPTABLE = '4.06'
-      PRECONDITION_FAILED = '4.12'
-      REQUEST_ENTITY_TOO_LARGE = '4.13'
-      UNSUPPORTED_CONTENT_FORMAT = '4.15'
-
-      INTERNAL_SERVER_ERROR = '5.00'
-      NOT_IMPLEMENTED = '5.01'
-      BAD_GATEWAY = '5.02'
-      SERVICE_UNAVAILABLE = '5.03'
-      GATEWAY_TIMEOUT = '5.04'
-      PROXYING_NOT_SUPPORTED = '5.05'
-    end
-
     # Returns a JSON response with 2.05 Content status
     # @param data [Hash] The data to return as JSON
     # @return [Hash] The data hash
     def json(data = {})
       data
-    end
-
-    # Returns a 2.01 Created response
-    # @param data [Hash] Optional response data
-    # @return [Takagi::Message::Outbound]
-    def created(data = {})
-      request.to_response(CoAPCodes::CREATED, data)
-    end
-
-    # Returns a 2.04 Changed response (successful PUT/POST)
-    # @param data [Hash] Optional response data
-    # @return [Takagi::Message::Outbound]
-    def changed(data = {})
-      request.to_response(CoAPCodes::CHANGED, data)
-    end
-
-    # Returns a 2.02 Deleted response
-    # @param data [Hash] Optional response data
-    # @return [Takagi::Message::Outbound]
-    def deleted(data = {})
-      request.to_response(CoAPCodes::DELETED, data)
-    end
-
-    # Returns a 2.03 Valid response
-    # @param data [Hash] Optional response data
-    # @return [Takagi::Message::Outbound]
-    def valid(data = {})
-      request.to_response(CoAPCodes::VALID, data)
-    end
-
-    # Returns a 4.00 Bad Request error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def bad_request(message = 'Bad Request')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::BAD_REQUEST, data)
-    end
-
-    # Returns a 4.01 Unauthorized error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def unauthorized(message = 'Unauthorized')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::UNAUTHORIZED, data)
-    end
-
-    # Returns a 4.03 Forbidden error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def forbidden(message = 'Forbidden')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::FORBIDDEN, data)
-    end
-
-    # Returns a 4.04 Not Found error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def not_found(message = 'Not Found')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::NOT_FOUND, data)
-    end
-
-    # Returns a 4.05 Method Not Allowed error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def method_not_allowed(message = 'Method Not Allowed')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::METHOD_NOT_ALLOWED, data)
-    end
-
-    # Returns a 5.00 Internal Server Error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def server_error(message = 'Internal Server Error')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::INTERNAL_SERVER_ERROR, data)
-    end
-
-    # Returns a 5.03 Service Unavailable error
-    # @param message [String, Hash] Error message or data
-    # @return [Takagi::Message::Outbound]
-    def service_unavailable(message = 'Service Unavailable')
-      data = message.is_a?(Hash) ? message : { error: message }
-      request.to_response(CoAPCodes::SERVICE_UNAVAILABLE, data)
     end
 
     # Validates that required parameters are present
@@ -138,5 +37,37 @@ module Takagi
     def halt(response)
       throw :halt, response
     end
+
+    # Dynamically generate helper methods from CoAP::Response registry
+    # Iterate through all registered response codes
+    CoAP::Response.each_value do |code_number|
+      code_string = CoAP::Response.name_for(code_number)
+      metadata = CoAP::Response.metadata_for(code_number)
+      next unless metadata
+
+      symbol = metadata[:symbol]
+      next unless symbol
+
+      method_name = symbol.to_s
+
+      # Determine if this is a success (2.xx) or error (4.xx, 5.xx) response
+      if CoAP::Response.success?(code_number)
+        # Success methods take optional data hash
+        define_method(method_name) do |data = {}|
+          request.to_response(code_string, data)
+        end
+      else
+        # Error methods take optional message (string or hash)
+        default_message = code_string.split(' ', 2)[1] # Extract "Bad Request" from "4.00 Bad Request"
+
+        define_method(method_name) do |message = default_message|
+          data = message.is_a?(Hash) ? message : { error: message }
+          request.to_response(code_string, data)
+        end
+      end
+    end
+
+    # Alias for internal_server_error (more concise)
+    alias server_error internal_server_error
   end
 end

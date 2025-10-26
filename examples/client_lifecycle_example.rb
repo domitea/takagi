@@ -99,8 +99,8 @@ puts
 puts 'Pattern 5: Auto-Close Even With Errors'
 puts '=' * 50
 begin
-  Takagi::Client.new('coap://localhost:5683') do |client|
-    puts "Inside block. Client open: #{!client.closed?}"
+  Takagi::Client.new('coap://localhost:5683') do |clnt|
+    puts "Inside block. Client open: #{!clnt.closed?}"
     raise 'Simulated error'
   end
 rescue StandardError => e

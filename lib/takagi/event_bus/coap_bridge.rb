@@ -179,10 +179,12 @@ module Takagi
 
         # Unregister a resource (for testing)
         # @param address [String] Event address
-        # @return [Boolean] True if was registered
+        # @return [Boolean] True if was registered, false otherwise
         def unregister(address)
           @mutex.synchronize do
-            @registered_resources.delete?(address) || false
+            # Set#delete? returns the set if element was present, nil if not
+            # Convert to boolean: true if was present, false if not
+            !!@registered_resources.delete?(address)
           end
         end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'socket'
+require 'forwardable'
 require_relative 'client_base'
 require_relative 'message/retransmission_manager'
 
@@ -28,6 +29,13 @@ module Takagi
   #     client.close
   #   end
   class Client < ClientBase
+    extend Forwardable
+
+    # Delegate public methods to the implementation
+    def_delegators :@impl, :server_uri, :timeout, :callbacks, :closed?
+    def_delegators :@impl, :get, :post, :put, :delete, :on
+    def_delegators :@impl, :get_json, :post_json, :put_json, :close
+
     # Creates a new client and optionally yields it to a block.
     #
     # @param server_uri [String] URL of the Takagi server (e.g., 'coap://localhost:5683', 'localhost:5683')
@@ -64,38 +72,6 @@ module Takagi
       ensure
         close
       end
-    end
-
-    # Delegate server_uri to implementation
-    def server_uri
-      @impl&.server_uri
-    end
-
-    # Delegate timeout to implementation
-    def timeout
-      @impl&.timeout
-    end
-
-    # Delegate callbacks to implementation
-    def callbacks
-      @impl&.callbacks
-    end
-
-    # Delegate public ClientBase methods to implementation
-    %i[get post put delete on get_json post_json put_json].each do |method|
-      define_method(method) do |*args, &block|
-        @impl.public_send(method, *args, &block)
-      end
-    end
-
-    # Override close to delegate to implementation
-    def close
-      @impl&.close
-    end
-
-    # Override closed? to delegate to implementation
-    def closed?
-      @impl&.closed? || false
     end
 
     private
