@@ -7,6 +7,7 @@ require_relative 'event_bus/lru_cache'
 require_relative 'event_bus/future'
 require_relative 'event_bus/coap_bridge'
 require_relative 'event_bus/observer_cleanup'
+require_relative 'event_bus/message_buffer'
 
 module Takagi
   # High-level event distribution with Ractor-based async delivery.
@@ -87,22 +88,43 @@ module Takagi
       end
     end
 
+    # Helper method to get configuration with fallback to ENV
+    def self.config_value(config_key, env_key, default)
+      # Priority: Takagi.config > ENV > default
+      if defined?(Takagi.config) && Takagi.config.event_bus.respond_to?(config_key)
+        Takagi.config.event_bus.public_send(config_key)
+      elsif ENV[env_key]
+        ENV[env_key].to_i
+      else
+        default
+      end
+    end
+
     # Class-level storage
     @ractor_pool = EventBus::RactorPool.new(
-      ENV['EVENTBUS_RACTORS']&.to_i || 10
+      config_value(:ractors, 'EVENTBUS_RACTORS', 10)
     )
     @handlers = Hash.new { |h, k| h[k] = [] } # address => [handlers]
     @consumers = {} # consumer_id => Handler
     @mutex = Mutex.new
     @current_states = EventBus::LRUCache.new(
-      ENV['EVENTBUS_STATE_SIZE']&.to_i || 1000,
-      ENV['EVENTBUS_STATE_TTL']&.to_i || 3600
+      config_value(:state_cache_size, 'EVENTBUS_STATE_SIZE', 1000),
+      config_value(:state_cache_ttl, 'EVENTBUS_STATE_TTL', 3600)
     )
     @cleanup = EventBus::ObserverCleanup.new(
-      interval: ENV['EVENTBUS_CLEANUP_INTERVAL']&.to_i || 60,
-      max_age: ENV['EVENTBUS_MAX_OBSERVER_AGE']&.to_i || 600
+      interval: config_value(:cleanup_interval, 'EVENTBUS_CLEANUP_INTERVAL', 60),
+      max_age: config_value(:max_observer_age, 'EVENTBUS_MAX_OBSERVER_AGE', 600)
     )
     @last_index = {} # For round-robin selection
+    @message_store = nil # Optional message buffering (configurable)
+
+    # Auto-enable message buffering if configured
+    if defined?(Takagi.config) && Takagi.config.event_bus.message_buffering_enabled
+      @message_store = MessageBuffer.new(
+        max_messages: Takagi.config.event_bus.message_buffer_max_messages,
+        ttl: Takagi.config.event_bus.message_buffer_ttl
+      )
+    end
 
     class << self
       # ============================================
@@ -119,6 +141,9 @@ module Takagi
       #   EventBus.publish('sensor.temperature.room1', { value: 25.5, unit: 'C' })
       def publish(address, body = nil, headers: {})
         message = Message.new(address, body, headers: headers)
+
+        # Hook: Store message if buffering enabled
+        @message_store&.store(address, message)
 
         # ALWAYS deliver locally (fast in-memory)
         @mutex.synchronize do
@@ -293,6 +318,86 @@ module Takagi
       alias unsubscribe unregister     # CoAP Observe style
 
       # ============================================
+      # MESSAGE BUFFERING CONFIGURATION
+      # ============================================
+
+      # Configure message store (for buffering/replay)
+      # @param store [MessageBuffer, Object] Message store instance (nil to disable)
+      # @return [MessageBuffer, Object, nil] Configured store
+      #
+      # @example Enable default buffering
+      #   EventBus.enable_message_buffering
+      #
+      # @example Custom configuration
+      #   EventBus.configure_message_store(
+      #     MessageBuffer.new(max_messages: 200, ttl: 600)
+      #   )
+      #
+      # @example Custom plugin store
+      #   EventBus.configure_message_store(RedisMessageStore.new)
+      def configure_message_store(store)
+        @message_store = store
+      end
+
+      # Enable default message buffering
+      # @param max_messages [Integer] Max messages per address
+      # @param ttl [Integer] Time-to-live in seconds
+      # @return [MessageBuffer] Configured buffer
+      def enable_message_buffering(max_messages: 100, ttl: 300)
+        @message_store = MessageBuffer.new(max_messages: max_messages, ttl: ttl)
+      end
+
+      # Disable message buffering
+      def disable_message_buffering
+        @message_store&.shutdown if @message_store.respond_to?(:shutdown)
+        @message_store = nil
+      end
+
+      # Get current message store
+      # @return [MessageBuffer, Object, nil] Current message store
+      def message_store
+        @message_store
+      end
+
+      # Replay buffered messages for an address
+      # @param address [String] Event address
+      # @param since [Time, nil] Return messages since this time (nil = all)
+      # @return [Array<Message>] Buffered messages
+      #
+      # @example Replay all buffered messages
+      #   EventBus.replay('sensor.temperature.room1')
+      #
+      # @example Replay last 60 seconds
+      #   EventBus.replay('sensor.temperature.room1', since: Time.now - 60)
+      def replay(address, since: nil)
+        return [] unless @message_store
+
+        @message_store.replay(address, since: since)
+      end
+
+      # Replay buffered messages to a consumer
+      # Useful for late joiners or reconnecting nodes
+      # @param address [String] Event address
+      # @param since [Time, nil] Replay messages since this time
+      # @yield [message] Block called for each buffered message
+      #
+      # @example Replay to new subscriber
+      #   EventBus.consumer('sensor.temperature.room1') do |msg|
+      #     puts "Temp: #{msg.body[:value]}"
+      #   end
+      #   # Catch up on last 5 minutes
+      #   EventBus.replay_to('sensor.temperature.room1', since: Time.now - 300) do |msg|
+      #     puts "Missed: #{msg.body[:value]}"
+      #   end
+      def replay_to(address, since: nil, &block)
+        raise ArgumentError, 'Block required' unless block
+
+        messages = replay(address, since: since)
+        messages.each(&block)
+        messages.size
+      end
+
+      # ============================================
       # UTILITY METHODS
       # ============================================
 
@@ -335,7 +440,7 @@ module Takagi
       # Get EventBus statistics
       # @return [Hash] Statistics
       def stats
-        {
+        base_stats = {
           consumers: @consumers.size,
           addresses: @handlers.keys.size,
           ractor_pool_size: @ractor_pool.size,
@@ -343,6 +448,13 @@ module Takagi
           distributed_addresses: addresses.select { |a| distributed?(a) }.size,
           local_addresses: addresses.select { |a| local_only?(a) }.size
         }
+
+        # Add message buffer stats if enabled
+        if @message_store&.respond_to?(:stats)
+          base_stats[:message_buffer] = @message_store.stats
+        end
+
+        base_stats
       end
 
       # Start background cleanup
@@ -360,6 +472,7 @@ module Takagi
         stop_cleanup
         @ractor_pool.shutdown
         @current_states.clear
+        @message_store&.shutdown if @message_store.respond_to?(:shutdown)
         @mutex.synchronize do
           @handlers.clear
           @consumers.clear

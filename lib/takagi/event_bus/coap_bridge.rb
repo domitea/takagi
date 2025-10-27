@@ -120,6 +120,16 @@ module Takagi
           end
         rescue StandardError => e
           Takagi.logger.error "Error publishing to observers for #{address}: #{e.message}"
+
+          # Store failed message for retry if message buffering is enabled
+          # This allows recovery when remote nodes reconnect
+          if EventBus.instance_variable_get(:@message_store)
+            EventBus.instance_variable_get(:@message_store).store_failed(
+              address,
+              message,
+              "coap_observers:#{path}"
+            )
+          end
         end
 
         # Subscribe to remote event via CoAP Observe
