@@ -9,7 +9,8 @@ module Takagi
     end
 
     def self.load_initializers
-      Dir.glob(File.expand_path('config/initializers/**/*.rb', __dir__)).each do |initializer|
+      initializer_glob = File.expand_path('../../config/initializers/**/*.rb', __dir__)
+      Dir.glob(initializer_glob).each do |initializer|
         require initializer
       end
     end

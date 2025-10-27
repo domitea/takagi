@@ -221,7 +221,7 @@ module Takagi
               end
 
               # Remove empty buffers to free memory
-              @buffers.delete_if { |_address, buffer| buffer.size.zero? }
+              @buffers.delete_if { |_address, buffer| buffer.empty? }
             end
           rescue StandardError => e
             warn "MessageBuffer cleanup error: #{e.message}" if defined?(Takagi.logger)

@@ -48,7 +48,7 @@ RSpec.describe Takagi::CBOR::Decoder do
     it 'decodes UTF-8 multibyte characters' do
       result = described_class.decode("\x62\xC3\xA4") # "ä" in UTF-8
       expect(result).to eq('ä')
-      expect(result.encoding).to eq(Encoding::UTF-8)
+      expect(result.encoding).to eq(Encoding::UTF_8)
     end
 
     it 'raises DecodeError for invalid UTF-8' do

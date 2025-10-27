@@ -16,7 +16,7 @@ module Takagi
         @running = true
         @thread = Thread.new do
           while @running
-            Takagi::ObserveRegistry.subscriptions.each_key do |path|
+            Takagi::ObserveRegistry.subscription_paths.each do |path|
               observable_route = Takagi::Base.router.find_observable(path)
               next unless observable_route
 

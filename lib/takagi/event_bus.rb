@@ -115,6 +115,7 @@ module Takagi
       interval: config_value(:cleanup_interval, 'EVENTBUS_CLEANUP_INTERVAL', 60),
       max_age: config_value(:max_observer_age, 'EVENTBUS_MAX_OBSERVER_AGE', 600)
     )
+    @cleanup.start
     @last_index = {} # For round-robin selection
     @message_store = nil # Optional message buffering (configurable)
 
@@ -355,9 +356,7 @@ module Takagi
 
       # Get current message store
       # @return [MessageBuffer, Object, nil] Current message store
-      def message_store
-        @message_store
-      end
+      attr_reader :message_store
 
       # Replay buffered messages for an address
       # @param address [String] Event address
@@ -450,9 +449,7 @@ module Takagi
         }
 
         # Add message buffer stats if enabled
-        if @message_store&.respond_to?(:stats)
-          base_stats[:message_buffer] = @message_store.stats
-        end
+        base_stats[:message_buffer] = @message_store.stats if @message_store.respond_to?(:stats)
 
         base_stats
       end

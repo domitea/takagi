@@ -89,6 +89,16 @@ module Takagi
             registry.transform_values { |info| info[:name] }
           end
 
+          # Iterate over registered values
+          #
+          # @yield [Integer] each registered numeric value
+          # @return [Enumerator] if no block given
+          def each_value(&block)
+            return enum_for(:each_value) unless block_given?
+
+            registry.each_key(&block)
+          end
+
           # Get all registered values
           #
           # @return [Array<Integer>] Array of all values

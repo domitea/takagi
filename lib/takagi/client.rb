@@ -169,18 +169,18 @@ module Takagi
     def request_simple(message, uri, &callback)
       socket = UDPSocket.new
       socket.send(message.to_bytes, 0, uri.host, uri.port || 5683)
-      response, = socket.recvfrom(1024)
-      socket.close
 
-      if callback
-        callback.call(response)
-      elsif @callbacks[:response]
-        @callbacks[:response].call(response)
-      else
-        puts response
+      unless socket.wait_readable(@timeout)
+        puts 'TakagiClient Error: Request timeout'
+        return
       end
+
+      response, = socket.recvfrom(1024)
+      deliver_raw_response(response, &callback)
     rescue StandardError => e
       puts "TakagiClient Error: #{e.message}"
+    ensure
+      socket&.close unless socket&.closed?
     end
 
     # RFC 7252 §4.2 compliant request with automatic retransmission
@@ -232,6 +232,16 @@ module Takagi
         puts "TakagiClient Error: #{state[:error]}"
       else
         puts 'TakagiClient Error: Request timeout'
+      end
+    end
+
+    def deliver_raw_response(response, &callback)
+      if callback
+        callback.call(response)
+      elsif @callbacks[:response]
+        @callbacks[:response].call(response)
+      else
+        puts response
       end
     end
   end

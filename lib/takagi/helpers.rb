@@ -40,7 +40,7 @@ module Takagi
 
     # Dynamically generate helper methods from CoAP::Response registry
     # Iterate through all registered response codes
-    CoAP::Response.values.each do |code_number|
+    CoAP::Response.each_value do |code_number|
       code_string = CoAP::Response.name_for(code_number)
       metadata = CoAP::Response.metadata_for(code_number)
       next unless metadata

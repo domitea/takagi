@@ -91,38 +91,16 @@ module Takagi
       def cleanup_stale_observers
         @mutex.synchronize { @stats[:runs] += 1 }
 
-        cleaned_count = 0
-
-        # TODO: Implement actual cleanup logic
-        # Current ObserveRegistry doesn't track observer timestamps
-        # Options:
-        # 1. Add :created_at and :last_notified_at to subscription structure
-        # 2. Track observer activity in a separate data structure
-        # 3. Use heartbeat mechanism to detect stale observers
-        #
-        # For now, log that cleanup ran successfully
-        Takagi.logger.debug "Observer cleanup completed (run ##{@stats[:runs]})"
-
-        # Example implementation (when timestamps are added):
-        # if defined?(Takagi::ObserveRegistry)
-        #   now = Time.now
-        #
-        #   Takagi::ObserveRegistry.subscriptions.each do |path, subscribers|
-        #     subscribers.reject! do |sub|
-        #       # Remove if no handler (remote observer) and hasn't been active
-        #       if !sub[:handler] && sub[:last_notified_at]
-        #         stale = (now - sub[:last_notified_at]) > @max_age
-        #         cleaned_count += 1 if stale
-        #         stale
-        #       else
-        #         false
-        #       end
-        #     end
-        #   end
-        # end
+        cleaned_count =
+          if defined?(Takagi::ObserveRegistry)
+            Takagi::ObserveRegistry.cleanup_stale_observers(max_age: @max_age)
+          else
+            0
+          end
 
         @mutex.synchronize { @stats[:cleaned] += cleaned_count }
 
+        Takagi.logger.debug "Observer cleanup completed (run ##{@stats[:runs]})"
         Takagi.logger.info "Cleaned up #{cleaned_count} stale observers" if cleaned_count.positive?
 
         cleaned_count

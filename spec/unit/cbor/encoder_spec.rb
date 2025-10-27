@@ -5,48 +5,48 @@ require 'spec_helper'
 RSpec.describe Takagi::CBOR::Encoder do
   describe '.encode' do
     it 'encodes small unsigned integers (0-23) in one byte' do
-      expect(described_class.encode(0)).to eq("\x00")
-      expect(described_class.encode(10)).to eq("\x0A")
-      expect(described_class.encode(23)).to eq("\x17")
+      expect(described_class.encode(0)).to eq("\x00".b)
+      expect(described_class.encode(10)).to eq("\x0A".b)
+      expect(described_class.encode(23)).to eq("\x17".b)
     end
 
     it 'encodes uint8 (24-255)' do
-      expect(described_class.encode(24)).to eq("\x18\x18")
-      expect(described_class.encode(100)).to eq("\x18d")
-      expect(described_class.encode(255)).to eq("\x18\xFF")
+      expect(described_class.encode(24)).to eq("\x18\x18".b)
+      expect(described_class.encode(100)).to eq("\x18d".b)
+      expect(described_class.encode(255)).to eq("\x18\xFF".b)
     end
 
     it 'encodes uint16 (256-65535)' do
-      expect(described_class.encode(256)).to eq("\x19\x01\x00")
-      expect(described_class.encode(1000)).to eq("\x19\x03\xE8")
-      expect(described_class.encode(65535)).to eq("\x19\xFF\xFF")
+      expect(described_class.encode(256)).to eq("\x19\x01\x00".b)
+      expect(described_class.encode(1000)).to eq("\x19\x03\xE8".b)
+      expect(described_class.encode(65535)).to eq("\x19\xFF\xFF".b)
     end
 
     it 'encodes uint32' do
-      expect(described_class.encode(65536)).to eq("\x1A\x00\x01\x00\x00")
-      expect(described_class.encode(1_000_000)).to eq("\x1A\x00\x0F\x42\x40")
+      expect(described_class.encode(65536)).to eq("\x1A\x00\x01\x00\x00".b)
+      expect(described_class.encode(1_000_000)).to eq("\x1A\x00\x0F\x42\x40".b)
     end
 
     it 'encodes uint64' do
-      expect(described_class.encode(4_294_967_296)).to eq("\x1B\x00\x00\x00\x01\x00\x00\x00\x00")
+      expect(described_class.encode(4_294_967_296)).to eq("\x1B\x00\x00\x00\x01\x00\x00\x00\x00".b)
     end
 
     it 'encodes negative integers' do
-      expect(described_class.encode(-1)).to eq("\x20")
-      expect(described_class.encode(-10)).to eq("\x29")
-      expect(described_class.encode(-100)).to eq("\x38\x63")
-      expect(described_class.encode(-1000)).to eq("\x39\x03\xE7")
+      expect(described_class.encode(-1)).to eq("\x20".b)
+      expect(described_class.encode(-10)).to eq("\x29".b)
+      expect(described_class.encode(-100)).to eq("\x38\x63".b)
+      expect(described_class.encode(-1000)).to eq("\x39\x03\xE7".b)
     end
 
     it 'encodes UTF-8 strings' do
-      expect(described_class.encode('')).to eq("\x60")
-      expect(described_class.encode('a')).to eq("\x61a")
-      expect(described_class.encode('IETF')).to eq("\x64IETF")
-      expect(described_class.encode('hello world')).to eq("\x6Bhello world")
+      expect(described_class.encode('')).to eq("\x60".b)
+      expect(described_class.encode('a')).to eq("\x61a".b)
+      expect(described_class.encode('IETF')).to eq("\x64IETF".b)
+      expect(described_class.encode('hello world')).to eq("\x6Bhello world".b)
     end
 
     it 'encodes symbols as strings' do
-      expect(described_class.encode(:hello)).to eq("\x65hello")
+      expect(described_class.encode(:hello)).to eq("\x65hello".b)
     end
 
     it 'handles UTF-8 multibyte characters' do
@@ -57,25 +57,25 @@ RSpec.describe Takagi::CBOR::Encoder do
     end
 
     it 'encodes arrays' do
-      expect(described_class.encode([])).to eq("\x80")
-      expect(described_class.encode([1, 2, 3])).to eq("\x83\x01\x02\x03")
-      expect(described_class.encode([1, [2, 3], [4, 5]])).to eq("\x83\x01\x82\x02\x03\x82\x04\x05")
+      expect(described_class.encode([])).to eq("\x80".b)
+      expect(described_class.encode([1, 2, 3])).to eq("\x83\x01\x02\x03".b)
+      expect(described_class.encode([1, [2, 3], [4, 5]])).to eq("\x83\x01\x82\x02\x03\x82\x04\x05".b)
     end
 
     it 'encodes hashes (maps)' do
-      expect(described_class.encode({})).to eq("\xA0")
+      expect(described_class.encode({})).to eq("\xA0".b)
       # Note: Hash order may vary, so we check structure
       result = described_class.encode({ 'a' => 1 })
       expect(result[0].ord).to eq(0xA1) # Map with 1 pair
     end
 
     it 'encodes booleans' do
-      expect(described_class.encode(false)).to eq("\xF4")
-      expect(described_class.encode(true)).to eq("\xF5")
+      expect(described_class.encode(false)).to eq("\xF4".b)
+      expect(described_class.encode(true)).to eq("\xF5".b)
     end
 
     it 'encodes nil' do
-      expect(described_class.encode(nil)).to eq("\xF6")
+      expect(described_class.encode(nil)).to eq("\xF6".b)
     end
 
     it 'encodes floats as 64-bit IEEE 754' do

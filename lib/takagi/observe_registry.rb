@@ -10,10 +10,16 @@ module Takagi
       attr_reader :subscriptions
 
       def subscribe(path, subscriber)
+        entry = subscriber.dup
+        entry[:created_at] ||= Time.now
+        entry[:last_notified_at] ||= nil
+
         @mutex.synchronize do
           @subscriptions[path] ||= []
-          @subscriptions[path] << subscriber
+          @subscriptions[path] << entry
         end
+
+        entry
       end
 
       def unsubscribe(path, token)
@@ -37,11 +43,34 @@ module Takagi
 
           deliver_notification(subscription, path, new_value)
           update_sequence(subscription, new_value)
+          subscription[:last_notified_at] = Time.now
         end
       end
 
       def sender
         @sender ||= Takagi::Observer::Sender.new
+      end
+
+      def subscription_paths
+        @mutex.synchronize { @subscriptions.keys.dup }
+      end
+
+      def cleanup_stale_observers(max_age:, now: Time.now)
+        cutoff = now - max_age
+        cleaned = 0
+
+        @mutex.synchronize do
+          @subscriptions.each do |path, subscribers|
+            subscribers.reject! do |subscription|
+              stale = stale_subscription?(subscription, cutoff)
+              cleaned += 1 if stale
+              stale
+            end
+            @subscriptions.delete(path) if subscribers.empty?
+          end
+        end
+
+        cleaned
       end
 
       private
@@ -71,6 +100,15 @@ module Takagi
       def update_sequence(subscription, new_value)
         subscription[:last_value] = new_value
         subscription[:last_seq] = (subscription[:last_seq] || 0) + 1
+      end
+
+      def stale_subscription?(subscription, cutoff)
+        return false if subscription[:handler]
+
+        last_activity = subscription[:last_notified_at] || subscription[:created_at]
+        return false unless last_activity
+
+        last_activity < cutoff
       end
     end
   end

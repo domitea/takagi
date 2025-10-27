@@ -3,6 +3,8 @@
 require "takagi"
 
 def find_free_port
+  return (ENV['RSPEC_DEFAULT_PORT'] || 5683).to_i if ENV['RSPEC_DISABLE_UDP']
+
   socket = UDPSocket.new
   socket.bind("127.0.0.1", 0)
   port = socket.addr[1]
@@ -21,7 +23,7 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 
-  Dir["#{File.dirname(__FILE__)}/**/*.rb"].each { |file| require file }
+  Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].sort.each { |file| require file }
 
   def send_coap_request(type, method, path, payload = nil, token: ''.b, message_id: rand(0..0xFFFF), query: nil, options: {})
     raise ArgumentError, 'CoAP tokens must be 8 bytes or fewer' if token.bytesize > 8

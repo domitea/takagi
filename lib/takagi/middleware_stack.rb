@@ -129,7 +129,7 @@ module Takagi
 
       # Try as a full class name
       begin
-        return Object.const_get(name)
+        Object.const_get(name)
       rescue NameError
         @logger.warn "Middleware class not found: #{name}"
         nil

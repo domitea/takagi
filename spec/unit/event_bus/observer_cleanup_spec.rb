@@ -75,12 +75,11 @@ RSpec.describe Takagi::EventBus::ObserverCleanup do
       cleanup = described_class.new(interval: 1, max_age: 60)
 
       cleanup.start
+      thread = cleanup.instance_variable_get(:@thread)
       sleep 0.1
       cleanup.stop
 
-      # Thread should be gone
-      thread = Thread.list.find { |t| t.name == 'ObserverCleanup' }
-      expect(thread).to be_nil
+      expect(thread.alive?).to be false
     end
   end
 
@@ -155,6 +154,17 @@ RSpec.describe Takagi::EventBus::ObserverCleanup do
 
       expect { cleanup.cleanup_now }.not_to raise_error
       expect(cleanup.stats[:runs]).to eq(1)
+    end
+
+    it 'increments cleaned stats using ObserveRegistry cleanup count' do
+      cleanup = described_class.new(interval: 100, max_age: 42)
+      allow(Takagi::ObserveRegistry).to receive(:cleanup_stale_observers).and_return(3)
+
+      cleanup.cleanup_now
+
+      stats = cleanup.stats
+      expect(Takagi::ObserveRegistry).to have_received(:cleanup_stale_observers).with(max_age: 42)
+      expect(stats[:cleaned]).to eq(3)
     end
   end
 

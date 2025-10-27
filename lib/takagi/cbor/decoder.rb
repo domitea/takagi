@@ -25,7 +25,7 @@ module Takagi
     # Security features:
     # - Max nesting depth (prevents stack overflow)
     # - Max collection size (prevents memory exhaustion)
-    class Decoder
+    class Decoder # rubocop:disable Metrics/ClassLength
       # CBOR Major Types (RFC 8949 §3)
       MAJOR_TYPE_UNSIGNED_INT = 0
       MAJOR_TYPE_NEGATIVE_INT = 1
@@ -50,6 +50,17 @@ module Takagi
 
       # Tag values
       TAG_EPOCH_TIMESTAMP = 1
+
+      MAJOR_TYPE_HANDLERS = {
+        MAJOR_TYPE_UNSIGNED_INT => :handle_unsigned_int,
+        MAJOR_TYPE_NEGATIVE_INT => :handle_negative_int,
+        MAJOR_TYPE_BYTE_STRING => :read_bytes,
+        MAJOR_TYPE_TEXT_STRING => :read_string,
+        MAJOR_TYPE_ARRAY => :read_array,
+        MAJOR_TYPE_MAP => :read_map,
+        MAJOR_TYPE_TAG => :read_tagged,
+        MAJOR_TYPE_SIMPLE => :read_simple
+      }.freeze
 
       class << self
         # Decode CBOR bytes to Ruby object
@@ -84,35 +95,25 @@ module Takagi
         check_depth!
 
         major_type, value = read_type_and_value
+        handler = MAJOR_TYPE_HANDLERS[major_type]
+        raise DecodeError, "Unknown major type: #{major_type}" unless handler
 
-        case major_type
-        when MAJOR_TYPE_UNSIGNED_INT
-          value
-        when MAJOR_TYPE_NEGATIVE_INT
-          # RFC 8949 §3.1: -1 - n
-          -1 - value
-        when MAJOR_TYPE_BYTE_STRING
-          read_bytes(value)
-        when MAJOR_TYPE_TEXT_STRING
-          read_string(value)
-        when MAJOR_TYPE_ARRAY
-          read_array(value)
-        when MAJOR_TYPE_MAP
-          read_map(value)
-        when MAJOR_TYPE_TAG
-          read_tagged(value)
-        when MAJOR_TYPE_SIMPLE
-          read_simple(value)
-        else
-          raise DecodeError, "Unknown major type: #{major_type}"
-        end
-      rescue DecodeError
+        send(handler, value)
+      rescue DecodeError, UnsupportedError
         raise
       rescue StandardError => e
         raise DecodeError, "Decoding failed at position #{@pos}: #{e.message}"
       end
 
       private
+
+      def handle_unsigned_int(value)
+        value
+      end
+
+      def handle_negative_int(value)
+        -1 - value
+      end
 
       # Check nesting depth to prevent stack overflow
       def check_depth!
@@ -136,7 +137,11 @@ module Takagi
         major_type = initial_byte >> 5
         additional = initial_byte & 0x1F
 
-        value = decode_additional_info(additional)
+        value = if major_type == MAJOR_TYPE_SIMPLE
+                  additional
+                else
+                  decode_additional_info(additional)
+                end
 
         [major_type, value]
       end
@@ -228,9 +233,7 @@ module Takagi
         # Force UTF-8 encoding and validate
         str.force_encoding('UTF-8')
 
-        unless str.valid_encoding?
-          raise DecodeError, 'Invalid UTF-8 encoding in text string'
-        end
+        raise DecodeError, 'Invalid UTF-8 encoding in text string' unless str.valid_encoding?
 
         str
       end
@@ -277,9 +280,7 @@ module Takagi
           timestamp_value = decode
 
           case timestamp_value
-          when Integer
-            Time.at(timestamp_value)
-          when Float
+          when Integer, Float
             Time.at(timestamp_value)
           else
             raise DecodeError, "Invalid timestamp value type: #{timestamp_value.class}"
@@ -343,7 +344,7 @@ module Takagi
           return mantissa.zero? ? Float::INFINITY : Float::NAN
         else
           # Normalized
-          result = (1.0 + mantissa.to_f / (2**10)) * (2**(exponent - 15))
+          result = (1.0 + (mantissa.to_f / (2**10))) * (2**(exponent - 15))
         end
 
         sign.zero? ? result : -result
@@ -354,7 +355,7 @@ module Takagi
         check_available(4)
         float_bytes = @bytes[@pos, 4]
         @pos += 4
-        float_bytes.unpack1('g')  # Big-endian single-precision float
+        float_bytes.unpack1('g') # Big-endian single-precision float
       end
 
       # Read 64-bit float (IEEE 754 double-precision)
@@ -362,7 +363,7 @@ module Takagi
         check_available(8)
         float_bytes = @bytes[@pos, 8]
         @pos += 8
-        float_bytes.unpack1('G')  # Big-endian double-precision float
+        float_bytes.unpack1('G') # Big-endian double-precision float
       end
 
       # Check if enough bytes are available
@@ -379,6 +380,6 @@ module Takagi
 
         raise DecodeError, "Collection size #{size} exceeds maximum (#{MAX_COLLECTION_SIZE})"
       end
-    end
+    end # rubocop:enable Metrics/ClassLength
   end
 end

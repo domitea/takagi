@@ -51,6 +51,18 @@ module Takagi
       MAX_UINT32 = 0xFFFFFFFF
       MAX_UINT64 = 0xFFFFFFFFFFFFFFFF
 
+      TYPE_HANDLERS = {
+        Integer => :encode_integer,
+        Float => :encode_float,
+        String => :encode_string,
+        Array => :encode_array,
+        Hash => :encode_map,
+        TrueClass => :encode_simple,
+        FalseClass => :encode_simple,
+        NilClass => :encode_simple,
+        Time => :encode_timestamp
+      }.freeze
+
       class << self
         # Encode a Ruby object to CBOR bytes
         #
@@ -74,33 +86,33 @@ module Takagi
       # @return [String] CBOR-encoded binary string
       # @raise [EncodeError] if object cannot be encoded
       def encode(obj)
-        case obj
-        when Integer
-          encode_integer(obj)
-        when Float
-          encode_float(obj)
-        when String
-          encode_string(obj)
-        when Symbol
-          encode_string(obj.to_s)
-        when Array
-          encode_array(obj)
-        when Hash
-          encode_map(obj)
-        when TrueClass, FalseClass, NilClass
-          encode_simple(obj)
-        when Time
-          encode_timestamp(obj)
-        else
-          raise EncodeError, "Cannot encode #{obj.class}: #{obj.inspect}"
-        end
+        encode_value(obj)
+      end
+
+      private
+
+      def encode_value(obj)
+        handler = handler_for(obj)
+        send(handler, obj)
       rescue EncodeError
         raise
       rescue StandardError => e
         raise EncodeError, "Encoding failed: #{e.message}"
       end
 
-      private
+      def handler_for(obj)
+        return :encode_symbol if obj.is_a?(Symbol)
+
+        TYPE_HANDLERS.each do |klass, method|
+          return method if obj.is_a?(klass)
+        end
+
+        raise EncodeError, "Cannot encode #{obj.class}: #{obj.inspect}"
+      end
+
+      def encode_symbol(symbol)
+        encode_string(symbol.to_s)
+      end
 
       # Encode integer (major type 0 or 1)
       def encode_integer(int)
@@ -165,7 +177,7 @@ module Takagi
         result = encode_with_length(MAJOR_TYPE_ARRAY, arr.size)
 
         arr.each do |item|
-          result << encode(item)
+          result << encode_value(item)
         end
 
         result
@@ -177,8 +189,8 @@ module Takagi
         result = encode_with_length(MAJOR_TYPE_MAP, hash.size)
 
         hash.each do |key, value|
-          result << encode(key)
-          result << encode(value)
+          result << encode_value(key)
+          result << encode_value(value)
         end
 
         result
@@ -206,7 +218,7 @@ module Takagi
         # Encode timestamp as integer (seconds since epoch)
         timestamp_int = time.to_i
 
-        tag_byte + encode_integer(timestamp_int)
+        tag_byte + encode_value(timestamp_int)
       end
 
       # Encode major type with length/value
