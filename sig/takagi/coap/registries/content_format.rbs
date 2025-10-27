@@ -1,0 +1,47 @@
+module Takagi
+  module CoAP
+    module Registries
+      # CoAP Content-Format Registry (RFC 7252 §12.3)
+      #
+      # Extensible registry for CoAP content-format codes.
+      # Plugins can register custom content formats without modifying core code.
+      #
+      # @example Using predefined formats
+      #   Takagi::CoAP::Registries::ContentFormat::JSON          # => 50
+      #   Takagi::CoAP::Registries::ContentFormat::TEXT_PLAIN    # => 0
+      #
+      # @example Registering a custom format
+      #   Takagi::CoAP::Registries::ContentFormat.register(65000, 'application/custom', :custom)
+      #   Takagi::CoAP::Registries::ContentFormat::CUSTOM  # => 65000
+      #
+      # @example Looking up format names
+      #   Takagi::CoAP::Registries::ContentFormat.name_for(50)  # => "application/json"
+      class ContentFormat < Base
+        # Get MIME type for a content-format code
+        # @param code [Integer] Content-format code
+        # @return [String, nil] MIME type
+        def self.mime_type_for: (untyped code) -> untyped
+
+        # Get content-format code for a MIME type
+        # @param mime_type [String] MIME type
+        # @return [Integer, nil] Content-format code
+        def self.code_for_mime: (untyped mime_type) -> untyped
+
+        # Check if format is JSON-based
+        # @param code [Integer] Content-format code
+        # @return [Boolean] true if JSON format
+        def self.json?: (untyped code) -> untyped
+
+        # Check if format is CBOR-based
+        # @param code [Integer] Content-format code
+        # @return [Boolean] true if CBOR format
+        def self.cbor?: (untyped code) -> untyped
+
+        # Check if format is text-based
+        # @param code [Integer] Content-format code
+        # @return [Boolean] true if text format
+        def self.text?: (untyped code) -> untyped
+      end
+    end
+  end
+end

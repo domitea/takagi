@@ -1,0 +1,11 @@
+module Takagi
+  module Middleware
+    class Authentication
+      def call: (untyped request) { (untyped) -> untyped } -> untyped
+
+      private
+
+      def valid_token?: (untyped request) -> untyped
+    end
+  end
+end

@@ -1,0 +1,171 @@
+module Takagi
+  module CBOR
+    # CBOR Decoder (RFC 8949)
+    #
+    # Decodes CBOR binary format to Ruby objects.
+    # Optimized for IoT/CoAP workloads with minimal footprint.
+    #
+    # Supported types:
+    # - Integers → Integer
+    # - Floats → Float
+    # - Text strings → String (UTF-8)
+    # - Byte strings → String (binary)
+    # - Arrays → Array
+    # - Maps → Hash (string keys)
+    # - Booleans → true/false
+    # - null → nil
+    # - Timestamps (tag 1) → Time
+    #
+    # @example Basic decoding
+    #   Decoder.decode("\xA2ktempera...")
+    #   # => { "temperature" => 25.5, "humidity" => 60 }
+    #
+    # Security features:
+    # - Max nesting depth (prevents stack overflow)
+    # - Max collection size (prevents memory exhaustion)
+    class Decoder
+      @bytes: untyped
+
+      @pos: untyped
+
+      @depth: untyped
+
+      # CBOR Major Types (RFC 8949 §3)
+      MAJOR_TYPE_UNSIGNED_INT: 0
+
+      MAJOR_TYPE_NEGATIVE_INT: 1
+
+      MAJOR_TYPE_BYTE_STRING: 2
+
+      MAJOR_TYPE_TEXT_STRING: 3
+
+      MAJOR_TYPE_ARRAY: 4
+
+      MAJOR_TYPE_MAP: 5
+
+      MAJOR_TYPE_TAG: 6
+
+      MAJOR_TYPE_SIMPLE: 7
+
+      # Simple values (RFC 8949 §3.3)
+      SIMPLE_FALSE: 20
+
+      SIMPLE_TRUE: 21
+
+      SIMPLE_NULL: 22
+
+      SIMPLE_FLOAT16: 25
+
+      SIMPLE_FLOAT32: 26
+
+      SIMPLE_FLOAT64: 27
+
+      # Security limits
+      MAX_NESTING_DEPTH: 100
+
+      MAX_COLLECTION_SIZE: 100000
+
+      # Tag values
+      TAG_EPOCH_TIMESTAMP: 1
+
+      MAJOR_TYPE_HANDLERS: ::Hash[untyped, :handle_unsigned_int | :handle_negative_int | :read_bytes | :read_string | :read_array | :read_map | :read_tagged | :read_simple]
+
+      # Decode CBOR bytes to Ruby object
+      #
+      # @param bytes [String] CBOR-encoded binary string
+      # @return [Object] Decoded Ruby object
+      # @raise [DecodeError] if bytes cannot be decoded
+      #
+      # @example
+      #   Decoder.decode("\x18\x2A")         # => 42
+      #   Decoder.decode("ehello")           # => "hello"
+      #   Decoder.decode("\x83\x01\x02\x03") # => [1, 2, 3]
+      def self.decode: (untyped bytes) -> untyped
+
+      # Initialize decoder with CBOR bytes
+      #
+      # @param bytes [String] CBOR-encoded binary string
+      def initialize: (untyped bytes) -> void
+
+      # Decode CBOR bytes to Ruby object
+      #
+      # @return [Object] Decoded Ruby object
+      # @raise [DecodeError] if bytes cannot be decoded
+      def decode: () -> untyped
+
+      private
+
+      def handle_unsigned_int: (untyped value) -> untyped
+
+      def handle_negative_int: (untyped value) -> untyped
+
+      # Check nesting depth to prevent stack overflow
+      def check_depth!: () -> (nil | untyped)
+
+      # Read major type and additional value
+      # RFC 8949 §3: Initial byte encoding
+      #
+      # Returns [major_type, value]
+      # - major_type: 0-7 (3 bits)
+      # - value: depends on additional info (5 bits)
+      def read_type_and_value: () -> ::Array[untyped]
+
+      # Decode additional information (RFC 8949 §3)
+      #
+      # Additional info encoding:
+      # 0-23:   Value is directly in additional info
+      # 24:     1-byte uint8 follows
+      # 25:     2-byte uint16 follows
+      # 26:     4-byte uint32 follows
+      # 27:     8-byte uint64 follows
+      # 28-30:  Reserved (error)
+      # 31:     Indefinite length (not supported in minimal impl)
+      def decode_additional_info: (untyped additional) -> untyped
+
+      # Read unsigned 8-bit integer
+      def read_uint8: () -> untyped
+
+      # Read unsigned 16-bit integer (big-endian)
+      def read_uint16: () -> untyped
+
+      # Read unsigned 32-bit integer (big-endian)
+      def read_uint32: () -> untyped
+
+      # Read unsigned 64-bit integer (big-endian)
+      def read_uint64: () -> untyped
+
+      # Read byte string (binary data)
+      def read_bytes: (untyped length) -> untyped
+
+      # Read UTF-8 text string
+      def read_string: (untyped length) -> untyped
+
+      # Read array
+      def read_array: (untyped length) -> untyped
+
+      # Read map (hash)
+      def read_map: (untyped length) -> untyped
+
+      # Read tagged value (RFC 8949 §3.4)
+      def read_tagged: (untyped tag) -> untyped
+
+      # Read simple value (RFC 8949 §3.3)
+      def read_simple: (untyped value) -> untyped
+
+      # Read 16-bit float (IEEE 754 half-precision)
+      def read_float16: () -> untyped
+
+      # Read 32-bit float (IEEE 754 single-precision)
+      def read_float32: () -> untyped
+
+      # Read 64-bit float (IEEE 754 double-precision)
+      def read_float64: () -> untyped
+
+      # Check if enough bytes are available
+      def check_available: (untyped needed) -> (nil | untyped)
+
+      # Check collection size to prevent memory exhaustion
+      def check_collection_size: (untyped size) -> (nil | untyped)
+    end
+  end
+end

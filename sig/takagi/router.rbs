@@ -1,0 +1,162 @@
+module Takagi
+  class Router
+    @routes: untyped
+
+    @routes_mutex: untyped
+
+    @logger: untyped
+
+    @route_matcher: untyped
+
+    @metadata_extractor: untyped
+
+    include Singleton
+
+    DEFAULT_CONTENT_FORMAT: 50
+
+    # Represents a registered route with its handler and CoRE Link Format metadata
+    class RouteEntry
+      @method: untyped
+
+      @path: untyped
+
+      @block: untyped
+
+      @receiver: untyped
+
+      @attribute_set: untyped
+
+      attr_reader method: untyped
+
+      attr_reader path: untyped
+
+      attr_reader block: untyped
+
+      attr_reader receiver: untyped
+
+      attr_reader attribute_set: untyped
+
+      def initialize: (method: untyped, path: untyped, block: untyped, ?metadata: ::Hash[untyped, untyped], ?receiver: untyped?) -> void
+
+      # Returns the underlying metadata hash for backward compatibility
+      def metadata: () -> untyped
+
+      # Configure CoRE Link Format attributes using DSL block
+      #
+      # @example
+      #   entry.configure_attributes do
+      #     rt 'sensor'
+      #     obs true
+      #     ct 'application/json'
+      #   end
+      def configure_attributes: () { (?) -> untyped } -> untyped
+
+      # Support for dup operation (used in discovery)
+      def initialize_copy: (untyped original) -> untyped
+    end
+
+    # Provides the execution context for route handlers, exposing helper
+    # methods for configuring CoRE Link Format attributes via a small DSL.
+    class RouteContext
+      @entry: untyped
+
+      @request: untyped
+
+      @params: untyped
+
+      @receiver: untyped
+
+      # Create a fresh AttributeSet for this request to avoid cross-request state sharing
+      # Initialize it with a copy of the entry's current metadata
+      @core_attributes: untyped
+
+      extend Forwardable
+
+      include Takagi::Helpers
+
+      attr_reader request: untyped
+
+      attr_reader params: untyped
+
+      # Aliases for common methods
+      alias content_format ct
+
+      alias observable obs
+
+      alias if_ interface
+
+      def initialize: (untyped entry, untyped request, untyped params, untyped receiver) -> void
+
+      def run: (untyped block) -> untyped
+
+      private
+
+      # Delegates method calls to the receiver (application instance)
+      # This allows route handlers to call application methods within their blocks
+      # Example: get '/users' do; fetch_users; end - calls application's fetch_users method
+      def method_missing: (untyped name, *untyped) ?{ (?) -> untyped } -> untyped
+
+      # Required pair for method_missing to properly support respond_to?
+      def respond_to_missing?: (untyped name, ?bool include_private) -> untyped
+    end
+
+    def initialize: () -> void
+
+    # Registers a new route for a given HTTP method and path
+    # @param method [String] The HTTP method (GET, POST, etc.)
+    # @param path [String] The URL path, can include dynamic segments like `:id`
+    # @param block [Proc] The handler to be executed when the route is matched
+    def add_route: (untyped method, untyped path, ?metadata: ::Hash[untyped, untyped]) { (?) -> untyped } -> untyped
+
+    # Registers a OBSERVE route
+    # @param path [String] The URL path
+    # @param block [Proc] The handler function
+    def observable: (untyped path, ?metadata: ::Hash[untyped, untyped]) { (?) -> untyped } -> untyped
+
+    def all_routes: () -> untyped
+
+    def find_observable: (untyped path) -> untyped
+
+    # Finds a registered route for a given method and path
+    # @param method [String] HTTP method
+    # @param path [String] URL path
+    # @return [Proc, Hash] The matching handler and extracted parameters
+    def find_route: (untyped method, untyped path) -> untyped
+
+    def link_format_entries: () -> untyped
+
+    # Applies CoRE metadata outside the request cycle. Useful for boot time
+    # configuration where the DSL block does not have a live request object.
+    def configure_core: (untyped method, untyped path) ?{ (?) -> untyped } -> (nil | untyped)
+
+    private
+
+    def wrap_block: (untyped entry) -> (nil | untyped)
+
+    # Matches dynamic routes that contain parameters (e.g., `/users/:id`)
+    # Delegates to RouteMatcher for the actual matching logic
+    # @param method [String] HTTP method
+    # @param path [String] Request path
+    # @return [Array(RouteEntry, Hash)] Matched route entry and extracted parameters
+    def match_dynamic_route: (untyped method, untyped path) -> untyped
+
+    def build_route_entry: (untyped method, untyped path, untyped metadata, untyped block) -> untyped
+
+    # Normalizes route metadata with sensible defaults for CoRE Link Format
+    #
+    # @param method [String] HTTP-like method (GET, POST, OBSERVE, etc.)
+    # @param path [String] Route path
+    # @param metadata [Hash, nil] User-provided metadata
+    # @return [Hash] Normalized metadata with defaults applied
+    def normalize_metadata: (untyped method, untyped path, untyped metadata) -> untyped
+
+    def default_resource_type: (untyped method) -> ("core#observable" | "core#endpoint")
+
+    def default_interface: (untyped method) -> ("takagi.observe" | ::String)
+
+    # Executes route handler in metadata extraction mode to capture core block attributes
+    # Delegates to MetadataExtractor for the actual extraction logic
+    # @param entry [RouteEntry] The route entry to extract metadata from
+    def extract_metadata_from_handler: (untyped entry) -> untyped
+  end
+end

@@ -1,0 +1,69 @@
+module Takagi
+  # Middleware stack for processing CoAP requests
+  #
+  # Provides a Rack-style middleware chain for request/response processing.
+  # Middleware can be configured via Takagi.config.middleware or programmatically.
+  #
+  # @example Programmatic configuration
+  #   stack = MiddlewareStack.instance
+  #   stack.use(Takagi::Middleware::Logging.new)
+  #   stack.use(Takagi::Middleware::Caching.new)
+  #
+  # @example YAML configuration (takagi.yml)
+  #   middleware:
+  #     enabled: true
+  #     stack:
+  #       - Logging
+  #       - name: Caching
+  #         options:
+  #           ttl: 300
+  class MiddlewareStack
+    @logger: untyped
+
+    @middlewares: untyped
+
+    @router: untyped
+
+    @config_loaded: untyped
+
+    include Singleton
+
+    attr_reader middlewares: untyped
+
+    def initialize: () -> void
+
+    # Load middleware from Takagi configuration
+    # This is called lazily on first request to ensure config is loaded
+    def load_from_config: () -> untyped
+
+    # Adds a new middleware to the stack
+    # @param middleware [Object] Middleware instance that responds to `call`
+    def use: (untyped middleware) -> untyped
+
+    # Processes the request through the middleware stack and routes it
+    # @param request [Takagi::Message::Inbound] Incoming request object
+    # @return [Takagi::Message::Outbound] The final processed response
+    def call: (untyped request) -> untyped
+
+    # Clear all middleware (useful for testing)
+    def clear: () -> untyped
+
+    # Reset configuration loaded flag (useful for testing)
+    def reset!: () -> untyped
+
+    private
+
+    # Load and instantiate a middleware from configuration
+    # @param config [Hash] Middleware configuration with :name and :options
+    def load_middleware: (untyped config) -> untyped
+
+    # Resolve middleware class from name
+    # Supports both short names (e.g., "Logging") and full names (e.g., "MyApp::CustomMiddleware")
+    def resolve_middleware_class: (untyped name) -> untyped
+
+    # Instantiate middleware with or without options
+    # @param klass [Class] Middleware class
+    # @param options [Hash] Options to pass to initializer
+    def instantiate_middleware: (untyped klass, untyped options) -> untyped
+  end
+end

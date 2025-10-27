@@ -1,0 +1,88 @@
+module Takagi
+  class EventBus
+    module AsyncExecutor
+      # Thread-based executor (default fallback)
+      class ThreadExecutor
+        @size: untyped
+
+        @queue: untyped
+
+        @threads: untyped
+
+        @shutdown: untyped
+
+        attr_reader size: untyped
+
+        def initialize: (size: untyped) -> void
+
+        def post: (untyped handler, untyped message) -> untyped
+
+        def register_handler: (untyped _handler) -> nil
+
+        def unregister_handler: (untyped _handler) -> nil
+
+        def shutdown: () -> (nil | untyped)
+
+        def running?: () -> untyped
+
+        def stats: () -> { mode: :threads, size: untyped }
+
+        private
+
+        def start_workers: () -> untyped
+      end
+
+      # Process-based executor for multi-reactor workloads
+      class ProcessExecutor
+        @processes: untyped
+
+        @threads: untyped
+
+        @mutex: untyped
+
+        @jobs: untyped
+
+        @next_index: untyped
+
+        @needs_restart: untyped
+
+        Job: untyped
+
+        def initialize: (processes: untyped, threads: untyped) -> void
+
+        def post: (untyped handler, untyped message) -> untyped
+
+        # Mark for restart so new handlers are visible in workers
+        def register_handler: (untyped _handler) -> untyped
+
+        def unregister_handler: (untyped _handler) -> untyped
+
+        def shutdown: () -> untyped
+
+        def stats: () -> { mode: :processes, size: untyped }
+
+        private
+
+        def ensure_running: () -> (nil | untyped)
+
+        def mark_restart_needed: () -> untyped
+
+        def restart_workers_locked: () -> untyped
+
+        def shutdown_workers: () -> untyped
+
+        def spawn_workers_locked: () -> (nil | untyped)
+
+        def fork_worker: (untyped index) -> untyped
+
+        def run_worker: (untyped reader, untyped index) -> untyped
+
+        def dispatch: (untyped handler, untyped message) -> (nil | untyped)
+
+        def select_job: () -> untyped
+
+        def reopen_worker: (untyped index) -> untyped
+      end
+    end
+  end
+end

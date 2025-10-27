@@ -1,0 +1,12 @@
+module Takagi
+  # Builds CoAP responses from middleware results
+  class ResponseBuilder
+    # Builds a response from the middleware result
+    #
+    # @param inbound_request [Takagi::Message::Inbound] The original request
+    # @param result [Takagi::Message::Outbound, Hash, Object] The middleware result
+    # @param logger [Logger, nil] Optional logger for debugging
+    # @return [Takagi::Message::Outbound] The response message
+    def self.build: (untyped inbound_request, untyped result, ?logger: untyped?) -> untyped
+  end
+end

@@ -1,0 +1,48 @@
+module Takagi
+  module Message
+    # Class for outbound message that is coming from server
+    class Outbound < Base
+      @code: untyped
+
+      @token: untyped
+
+      @message_id: untyped
+
+      @type: untyped
+
+      @options: untyped
+
+      @payload: untyped
+
+      def initialize: (code: untyped, payload: untyped, ?token: untyped?, ?message_id: untyped?, ?type: untyped, ?options: ::Hash[untyped, untyped]) -> void
+
+      def to_bytes: () -> untyped
+
+      private
+
+      def with_error_handling: () { () -> untyped } -> untyped
+
+      def log_generation: () -> untyped
+
+      def build_header: () -> untyped
+
+      def token_bytes: () -> untyped
+
+      def build_options_section: () -> untyped
+
+      def build_payload_section: () -> untyped
+
+      def log_final_packet: (untyped packet) -> untyped
+
+      def normalize_options: (untyped options) -> untyped
+
+      def flattened_options: () -> untyped
+
+      def encode_option_value: (untyped value) -> untyped
+
+      def encode_integer_option_value: (untyped value) -> untyped
+
+      def encode_option_header_value: (untyped value) -> untyped
+    end
+  end
+end

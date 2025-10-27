@@ -1,0 +1,43 @@
+module Takagi
+  module CoAP
+    module Registries
+      # CoAP Option Number Registry (RFC 7252 §5.10)
+      #
+      # Extensible registry for CoAP option numbers.
+      # Plugins can register custom options without modifying core code.
+      #
+      # @example Using predefined options
+      #   Takagi::CoAP::Registries::Option::URI_PATH         # => 11
+      #   Takagi::CoAP::Registries::Option::CONTENT_FORMAT   # => 12
+      #
+      # @example Registering a custom option
+      #   Takagi::CoAP::Registries::Option.register(65000, 'Custom-Option', :custom_option)
+      #   Takagi::CoAP::Registries::Option::CUSTOM_OPTION  # => 65000
+      #
+      # @example Looking up option names
+      #   Takagi::CoAP::Registries::Option.name_for(11)  # => "Uri-Path"
+      class Option < Base
+        # Check if an option is critical
+        # Critical options must be understood by the recipient
+        # @param number [Integer] Option number
+        # @return [Boolean] true if critical
+        def self.critical?: (untyped number) -> untyped
+
+        # Check if an option is unsafe to forward
+        # @param number [Integer] Option number
+        # @return [Boolean] true if unsafe
+        def self.unsafe?: (untyped number) -> untyped
+
+        # Check if an option has NoCacheKey property
+        # @param number [Integer] Option number
+        # @return [Boolean] true if NoCacheKey
+        def self.no_cache_key?: (untyped number) -> untyped
+
+        # Check if option number is valid
+        # @param number [Integer] Option number
+        # @return [Boolean] true if valid
+        def self.valid?: (untyped number) -> untyped
+      end
+    end
+  end
+end

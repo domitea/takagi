@@ -1,0 +1,10 @@
+module Takagi
+  module Network
+    # Sends CoAP responses to TCP clients with framing.
+    class TcpSender
+      include Singleton
+
+      def transmit: (untyped packet, untyped address, untyped port) -> untyped
+    end
+  end
+end

@@ -1,0 +1,52 @@
+module Takagi
+  module Server
+    # UDP server for handling CoAP messages
+    class Udp
+      @port: untyped
+
+      @worker_processes: untyped
+
+      @worker_threads: untyped
+
+      @middleware_stack: untyped
+
+      @router: untyped
+
+      @logger: untyped
+
+      @watcher: untyped
+
+      @socket: untyped
+
+      @sender: untyped
+
+      @shutdown_called: untyped
+
+      @worker_pids: untyped
+
+      def initialize: (?port: ::Integer, ?worker_processes: ::Integer, ?worker_threads: ::Integer, ?middleware_stack: untyped?, ?router: untyped?, ?logger: untyped?, ?watcher: untyped?) -> void
+
+      # Starts the server with multiple worker processes
+      def run!: () -> untyped
+
+      # Gracefully shuts down all workers
+      def shutdown!: () -> (nil | untyped)
+
+      private
+
+      def log_boot_details: () -> untyped
+
+      def spawn_workers: () -> untyped
+
+      def fork_worker: () -> untyped
+
+      def worker_configuration: () -> { port: untyped, socket: untyped, middleware_stack: untyped, sender: untyped, logger: untyped, threads: untyped }
+
+      def close_socket: () -> untyped
+
+      def terminate_workers: () -> (nil | untyped)
+
+      def test_environment?: () -> untyped
+    end
+  end
+end

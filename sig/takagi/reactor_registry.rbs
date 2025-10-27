@@ -1,0 +1,14 @@
+module Takagi
+  # Tracks background reactor instances and controls their lifecycle.
+  module ReactorRegistry
+    self.@reactors: untyped
+
+    attr_reader self.reactors: untyped
+
+    def self.register: (untyped reactor) -> untyped
+
+    def self.start_all: () -> untyped
+
+    def self.stop_all: () -> untyped
+  end
+end

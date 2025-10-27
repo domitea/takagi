@@ -1,0 +1,49 @@
+module Takagi
+  module Message
+    # Implements message deduplication as per RFC 7252 Section 4.4
+    #
+    # The server MUST detect duplicates by matching both Message ID and source endpoint.
+    # When a duplicate CON message is received, the server MUST resend the cached response.
+    #
+    # Cache entries expire after EXCHANGE_LIFETIME (247 seconds per RFC 7252 §4.8.2)
+    class DeduplicationCache
+      @cache: untyped
+
+      @mutex: untyped
+
+      # RFC 7252 §4.8.2: EXCHANGE_LIFETIME = 247 seconds
+      EXCHANGE_LIFETIME: 247
+
+      # Entry contains the cached response and metadata
+      CacheEntry: untyped
+
+      def initialize: () -> void
+
+      # Check if message is a duplicate and return cached response if available
+      # @param message_id [Integer] The CoAP Message ID
+      # @param source_endpoint [String] Source IP:Port identifier
+      # @return [String, nil] Cached response data or nil if not a duplicate
+      def check_duplicate: (untyped message_id, untyped source_endpoint) -> untyped
+
+      # Store a response for future duplicate detection
+      # @param message_id [Integer] The CoAP Message ID
+      # @param source_endpoint [String] Source IP:Port identifier
+      # @param response_data [String] The serialized response to cache
+      def store_response: (untyped message_id, untyped source_endpoint, untyped response_data) -> untyped
+
+      # Clear all cache entries (useful for testing)
+      def clear: () -> untyped
+
+      # Get cache statistics
+      def stats: () -> untyped
+
+      private
+
+      def cache_key: (untyped message_id, untyped source_endpoint) -> ::String
+
+      # Remove expired entries to prevent unbounded memory growth
+      # RFC 7252 §4.8.2: entries older than EXCHANGE_LIFETIME should be discarded
+      def cleanup_expired_entries: () -> untyped
+    end
+  end
+end

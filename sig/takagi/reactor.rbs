@@ -1,0 +1,20 @@
+module Takagi
+  # Coordinates local observables and remote observe subscriptions.
+  class Reactor
+    @observables: untyped
+
+    @observes: untyped
+
+    @watcher: untyped
+
+    def initialize: () -> void
+
+    def observable: (untyped path) { (?) -> untyped } -> untyped
+
+    def observe: (untyped uri) { (?) -> untyped } -> untyped
+
+    def trigger_observe: (untyped uri, untyped value) -> untyped
+
+    def start: () -> untyped
+  end
+end

@@ -1,0 +1,78 @@
+module Takagi
+  class EventBus
+    # Future for sync/async request-reply pattern (pure Ruby)
+    # Uses ConditionVariable for efficient waiting
+    #
+    # @example Blocking wait
+    #   future = Future.new
+    #   Thread.new { future.set_value(42) }
+    #   value = future.value(timeout: 1.0) # => 42
+    #
+    # @example Non-blocking check
+    #   future = Future.new
+    #   future.completed? # => false
+    #   future.set_value(42)
+    #   future.completed? # => true
+    #
+    # @example Error propagation
+    #   future = Future.new
+    #   future.set_error(StandardError.new("Failed"))
+    #   future.value # raises StandardError
+    class Future
+      @mutex: untyped
+
+      @condition: untyped
+
+      @value: untyped
+
+      @completed: untyped
+
+      @error: untyped
+
+      # Initialize a new Future
+      def initialize: () -> void
+
+      # Set the successful value of the Future
+      # @param value [Object] The value to set
+      # @raise [RuntimeError] If already completed
+      def set_value: (untyped value) -> untyped
+
+      # Set the error state of the Future
+      # @param error [Exception] The error to set
+      # @raise [RuntimeError] If already completed
+      def set_error: (untyped error) -> untyped
+
+      # Get the value of the Future (blocking)
+      # @param timeout [Float, nil] Timeout in seconds (nil = wait forever)
+      # @return [Object] The value
+      # @raise [Timeout::Error] If timeout expires before completion
+      # @raise [Exception] The error if Future completed with error
+      def value: (?timeout: untyped?) -> untyped
+
+      # Check if Future is completed
+      # @return [Boolean]
+      def completed?: () -> untyped
+
+      # Check if Future completed with error
+      # @return [Boolean]
+      def error?: () -> untyped
+
+      # Check if Future completed successfully
+      # @return [Boolean]
+      def success?: () -> untyped
+
+      # Get the error if present
+      # @return [Exception, nil]
+      def error: () -> untyped
+
+      # Try to get value without blocking
+      # @return [Object, nil] Value if completed, nil otherwise
+      def try_value: () -> untyped
+
+      # Wait for completion without returning value
+      # @param timeout [Float, nil] Timeout in seconds
+      # @return [Boolean] True if completed, false if timeout
+      def wait: (?timeout: untyped?) -> untyped
+    end
+  end
+end

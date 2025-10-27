@@ -1,0 +1,50 @@
+module Takagi
+  module Discovery
+    # Builds CoRE Link Format payloads as defined in RFC 6690.
+    class CoreLinkFormat
+      @router: untyped
+
+      @query: untyped
+
+      CONTENT_FORMAT: 40
+
+      def self.generate: (router: untyped, ?request: untyped?) -> untyped
+
+      def initialize: (untyped router, untyped raw_query) -> void
+
+      def generate: () -> untyped
+
+      private
+
+      attr_reader router: untyped
+
+      attr_reader query: untyped
+
+      def parse_query: (untyped raw_query) -> (::Hash[untyped, untyped] | untyped)
+
+      def filter_resources: (untyped resources) -> untyped
+
+      def matches_filter?: (untyped entry, untyped key, untyped values) -> untyped
+
+      def matches_list_attribute?: (untyped entry, untyped attribute, untyped values) -> untyped
+
+      def matches_numeric_attribute?: (untyped entry, untyped attribute, untyped values) -> untyped
+
+      def matches_string_attribute?: (untyped entry, untyped attribute, untyped values) -> untyped
+
+      def format_entry: (untyped entry) -> ::String
+
+      def normalize_path: (untyped path) -> untyped
+
+      def link_attributes_for: (untyped entry) -> untyped
+
+      def append_attribute: (untyped attrs, untyped name, untyped value) -> (nil | untyped)
+
+      def append_numeric_attribute: (untyped attrs, untyped name, untyped value) -> (nil | untyped)
+
+      def join_attributes: (untyped attrs) -> untyped
+
+      def server_link_entry: () -> (nil | untyped)
+    end
+  end
+end

@@ -1,0 +1,148 @@
+module Takagi
+  class Client
+    # Wrapper for CoAP responses providing convenient access to response data
+    # and status checking methods.
+    #
+    # Uses the CoAP registry system for all code checking and naming.
+    #
+    # @example Basic usage
+    #   client.get('/temperature') do |response|
+    #     if response.success?
+    #       puts "Temperature: #{response.payload}"
+    #     else
+    #       puts "Error: #{response.code_name}"
+    #     end
+    #   end
+    #
+    # @example Checking specific codes
+    #   response.ok?          # 2.05 Content
+    #   response.created?     # 2.01 Created
+    #   response.not_found?   # 4.04 Not Found
+    #   response.bad_request? # 4.00 Bad Request
+    class Response
+      @raw_data: untyped
+
+      @inbound: untyped
+
+      @code: untyped
+
+      @payload: untyped
+
+      @options: untyped
+
+      @token: untyped
+
+      attr_reader raw_data: untyped
+
+      attr_reader inbound: untyped
+
+      attr_reader code: untyped
+
+      attr_reader payload: untyped
+
+      attr_reader options: untyped
+
+      attr_reader token: untyped
+
+      # Creates a new Response wrapper
+      # @param raw_data [String] Raw binary response data
+      def initialize: (untyped raw_data) -> void
+
+      # Get the human-readable code name using CoAP registry
+      # @return [String] Code name (e.g., "2.05 Content", "4.04 Not Found")
+      def code_name: () -> untyped
+
+      # Get the numeric code class (2 = Success, 4 = Client Error, 5 = Server Error)
+      # @return [Integer] Code class
+      def code_class: () -> untyped
+
+      # Check if response is successful (2.xx)
+      # @return [Boolean]
+      def success?: () -> untyped
+
+      # Check if response is a client error (4.xx)
+      # @return [Boolean]
+      def client_error?: () -> untyped
+
+      # Check if response is a server error (5.xx)
+      # @return [Boolean]
+      def server_error?: () -> untyped
+
+      # Check if response has an error (4.xx or 5.xx)
+      # @return [Boolean]
+      def error?: () -> untyped
+
+      # Common 2.xx success codes (using registry)
+      def created?: () -> untyped
+
+      def deleted?: () -> untyped
+
+      def valid?: () -> untyped
+
+      def changed?: () -> untyped
+
+      def content?: () -> untyped
+
+      alias ok? content?
+
+      # Common 4.xx client error codes (using registry)
+      def bad_request?: () -> untyped
+
+      def unauthorized?: () -> untyped
+
+      def bad_option?: () -> untyped
+
+      def forbidden?: () -> untyped
+
+      def not_found?: () -> untyped
+
+      def method_not_allowed?: () -> untyped
+
+      def not_acceptable?: () -> untyped
+
+      def precondition_failed?: () -> untyped
+
+      def request_entity_too_large?: () -> untyped
+
+      def unsupported_content_format?: () -> untyped
+
+      # Common 5.xx server error codes (using registry)
+      def internal_server_error?: () -> untyped
+
+      def not_implemented?: () -> untyped
+
+      def bad_gateway?: () -> untyped
+
+      def service_unavailable?: () -> untyped
+
+      def gateway_timeout?: () -> untyped
+
+      def proxying_not_supported?: () -> untyped
+
+      # Parse payload as JSON
+      # @return [Hash, Array, nil] Parsed JSON or nil if parsing fails
+      def json: () -> untyped
+
+      # Check if response has JSON content-format
+      # @return [Boolean]
+      def json?: () -> untyped
+
+      # Get content-format option value
+      # @return [Integer, nil] Content-format code
+      def content_format: () -> (nil | untyped)
+
+      # String representation for debugging
+      # @return [String]
+      def to_s: () -> ::String
+
+      # Detailed inspection
+      # @return [String]
+      def inspect: () -> ::String
+
+      private
+
+      # Decode a binary string to an integer
+      def decode_integer_value: (untyped bytes) -> (nil | untyped)
+    end
+  end
+end

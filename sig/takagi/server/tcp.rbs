@@ -1,0 +1,42 @@
+module Takagi
+  module Server
+    # TCP server implementation for CoAP over TCP
+    class Tcp
+      @port: untyped
+
+      @worker_threads: untyped
+
+      @middleware_stack: untyped
+
+      @router: untyped
+
+      @logger: untyped
+
+      @watcher: untyped
+
+      @server: untyped
+
+      @sender: untyped
+
+      @workers: untyped
+
+      @shutdown_called: untyped
+
+      def initialize: (?port: ::Integer, ?worker_threads: ::Integer, ?middleware_stack: untyped?, ?router: untyped?, ?logger: untyped?, ?watcher: untyped?, ?sender: untyped?) -> void
+
+      def run!: () -> untyped
+
+      def shutdown!: () -> (nil | untyped)
+
+      private
+
+      def handle_connection: (untyped sock) -> untyped
+
+      def read_request: (untyped sock) -> (nil | untyped)
+
+      def build_response: (untyped inbound_request) -> untyped
+
+      def transmit_response: (untyped sock, untyped response) -> untyped
+    end
+  end
+end

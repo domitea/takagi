@@ -1,0 +1,23 @@
+module Takagi
+  # CoAP-over-TCP client for testing Takagi servers with TCP transport.
+  #
+  # This client implements CoAP over TCP (RFC 8323) with automatic length framing.
+  # Unlike the UDP client, TCP provides reliable delivery so no retransmission
+  # manager is needed.
+  #
+  # @example Basic usage with auto-close (recommended)
+  #   Takagi::TcpClient.open('coap+tcp://localhost:5683') do |client|
+  #     client.get('/temperature')
+  #   end
+  #
+  # @example Manual lifecycle management
+  #   client = Takagi::TcpClient.new('coap+tcp://localhost:5683')
+  #   begin
+  #     client.get('/temperature')
+  #   ensure
+  #     client.close
+  #   end
+  class TcpClient < ClientBase
+    def request: (untyped method, untyped path, ?untyped? payload) { (?) -> untyped } -> untyped
+  end
+end

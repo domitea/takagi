@@ -1,0 +1,62 @@
+module Takagi
+  class EventBus
+    # Background thread for stale observer cleanup
+    #
+    # Periodically cleans up stale observers from the ObserveRegistry.
+    # Observers are considered stale if they haven't received notifications
+    # for longer than max_age seconds.
+    #
+    # @example
+    #   cleanup = ObserverCleanup.new(interval: 60, max_age: 600)
+    #   cleanup.start
+    #   # ... cleanup runs in background ...
+    #   cleanup.stop
+    class ObserverCleanup
+      @interval: untyped
+
+      @max_age: untyped
+
+      @running: untyped
+
+      @thread: untyped
+
+      @mutex: untyped
+
+      @stats: untyped
+
+      attr_reader interval: untyped
+
+      attr_reader max_age: untyped
+
+      # Initialize observer cleanup
+      # @param interval [Integer] Cleanup interval in seconds (default: 60)
+      # @param max_age [Integer] Max observer age in seconds (default: 600)
+      def initialize: (?interval: ::Integer, ?max_age: ::Integer) -> void
+
+      # Start the cleanup thread
+      def start: () -> (nil | untyped)
+
+      # Stop the cleanup thread
+      def stop: () -> (nil | untyped)
+
+      # Check if cleanup is running
+      # @return [Boolean]
+      def running?: () -> untyped
+
+      # Get cleanup statistics
+      # @return [Hash] Statistics
+      def stats: () -> untyped
+
+      # Force a cleanup run (for testing)
+      def cleanup_now: () -> untyped
+
+      private
+
+      # Main cleanup loop
+      def run_cleanup_loop: () -> untyped
+
+      # Cleanup stale observers from ObserveRegistry
+      def cleanup_stale_observers: () -> untyped
+    end
+  end
+end

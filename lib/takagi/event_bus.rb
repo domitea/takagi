@@ -2,7 +2,7 @@
 
 require 'securerandom'
 require_relative 'event_bus/address_prefix'
-require_relative 'event_bus/ractor_pool'
+require_relative 'event_bus/async_executor'
 require_relative 'event_bus/lru_cache'
 require_relative 'event_bus/future'
 require_relative 'event_bus/coap_bridge'
@@ -10,7 +10,7 @@ require_relative 'event_bus/observer_cleanup'
 require_relative 'event_bus/message_buffer'
 
 module Takagi
-  # High-level event distribution with Ractor-based async delivery.
+  # High-level event distribution with threaded/process async delivery.
   # Built on top of ObserveRegistry with zero runtime dependencies.
   #
   # Supports both CoAP Observe style and Pub/Sub style APIs:
@@ -64,13 +64,14 @@ module Takagi
 
     # Event handler wrapper
     class Handler
-      attr_reader :address, :block, :options
+      attr_reader :address, :block, :options, :pool_id
 
       def initialize(address, options = {}, &block)
         @address = address
         @block = block
         @options = options
         @local_only = options.fetch(:local_only, false)
+        @pool_id = SecureRandom.uuid
       end
 
       def call(message)
@@ -101,11 +102,18 @@ module Takagi
     end
 
     # Class-level storage
-    @ractor_pool = EventBus::RactorPool.new(
-      config_value(:ractors, 'EVENTBUS_RACTORS', 10)
-    )
+    thread_default = config_value(:async_threads, 'EVENTBUS_ASYNC_THREADS', nil)
+    thread_default = config_value(:ractors, 'EVENTBUS_RACTORS', 10) if thread_default.nil?
+    process_count = config_value(:process_pool_size, 'EVENTBUS_PROCESS_POOL', 0)
+    @executor =
+      if process_count.positive?
+        AsyncExecutor::ProcessExecutor.new(processes: process_count, threads: thread_default)
+      else
+        AsyncExecutor::ThreadExecutor.new(size: thread_default)
+      end
     @handlers = Hash.new { |h, k| h[k] = [] } # address => [handlers]
     @consumers = {} # consumer_id => Handler
+    @handler_store = {}
     @mutex = Mutex.new
     @current_states = EventBus::LRUCache.new(
       config_value(:state_cache_size, 'EVENTBUS_STATE_SIZE', 1000),
@@ -267,7 +275,10 @@ module Takagi
         @mutex.synchronize do
           @handlers[address] << handler
           @consumers[consumer_id] = handler
+          @handler_store[handler.pool_id] = handler
         end
+
+        @executor.register_handler(handler) if @executor.respond_to?(:register_handler)
 
         # Auto-create CoAP observable resource if distributed and not local_only
         if distributed?(address) && !options[:local_only] && defined?(Takagi::Base)
@@ -281,13 +292,20 @@ module Takagi
       # Unregister a consumer
       # @param consumer_id [String] Consumer ID returned from consumer()
       def unregister(consumer_id)
+        handler = nil
         @mutex.synchronize do
           handler = @consumers.delete(consumer_id)
-          return unless handler
-
-          @handlers[handler.address].delete(handler)
-          @handlers.delete(handler.address) if @handlers[handler.address].empty?
+          if handler
+            list = @handlers[handler.address]
+            list&.delete(handler)
+            @handlers.delete(handler.address) if list&.empty?
+            @handler_store.delete(handler.pool_id)
+          end
         end
+
+        return unless handler
+
+        @executor.unregister_handler(handler) if @executor.respond_to?(:unregister_handler)
 
         log_debug "Unregistered consumer: #{consumer_id}"
       end
@@ -439,10 +457,15 @@ module Takagi
       # Get EventBus statistics
       # @return [Hash] Statistics
       def stats
+        executor_stats = if defined?(@executor) && @executor.respond_to?(:stats)
+                           @executor.stats
+                         else
+                           {}
+                         end
         base_stats = {
           consumers: @consumers.size,
           addresses: @handlers.keys.size,
-          ractor_pool_size: @ractor_pool.size,
+          async_executor: executor_stats,
           state_cache_size: @current_states.size,
           distributed_addresses: addresses.select { |a| distributed?(a) }.size,
           local_addresses: addresses.select { |a| local_only?(a) }.size
@@ -467,12 +490,13 @@ module Takagi
       # Shutdown EventBus (cleanup resources)
       def shutdown
         stop_cleanup
-        @ractor_pool.shutdown
+        @executor.shutdown if defined?(@executor)
         @current_states.clear
         @message_store&.shutdown if @message_store.respond_to?(:shutdown)
         @mutex.synchronize do
           @handlers.clear
           @consumers.clear
+          @handler_store.clear
         end
       end
 
@@ -518,11 +542,15 @@ module Takagi
         handlers[@last_index[address]]
       end
 
+      def handler_for_pool_id(pool_id)
+        @handler_store[pool_id]
+      end
+
+      public :handler_for_pool_id
+
       # Deliver message asynchronously via Ractor pool
       def deliver_async(handler, message)
-        @ractor_pool.post do
-          handler.call(message)
-        end
+        @executor.post(handler, message)
       end
 
       # Generate unique reply address

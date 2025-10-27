@@ -8,7 +8,8 @@ module Takagi
   class Config # rubocop:disable Metrics/ClassLength
     Observability = Struct.new(:backends, keyword_init: true)
     EventBusConfig = Struct.new(
-      :ractors, :state_cache_size, :state_cache_ttl, :cleanup_interval,
+      :ractors, :async_threads, :process_pool_size,
+      :state_cache_size, :state_cache_ttl, :cleanup_interval,
       :max_observer_age, :message_buffering_enabled, :message_buffer_max_messages,
       :message_buffer_ttl, keyword_init: true
     )
@@ -177,6 +178,8 @@ module Takagi
     def set_event_bus_defaults
       @event_bus = EventBusConfig.new(
         ractors: 10,
+        async_threads: 10,
+        process_pool_size: 0,
         state_cache_size: 1000,
         state_cache_ttl: 3600,
         cleanup_interval: 60,
@@ -221,7 +224,7 @@ module Takagi
     end
 
     def assign_event_bus_core(event_bus_data)
-      %w[ractors state_cache_size state_cache_ttl cleanup_interval max_observer_age].each do |key|
+      %w[ractors async_threads process_pool_size state_cache_size state_cache_ttl cleanup_interval max_observer_age].each do |key|
         assign_event_bus_setting(event_bus_data, key)
       end
     end

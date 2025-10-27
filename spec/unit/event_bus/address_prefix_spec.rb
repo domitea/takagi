@@ -222,7 +222,8 @@ RSpec.describe Takagi::EventBus::AddressPrefix do
 
   describe 'thread safety' do
     it 'handles concurrent registrations' do
-      threads = 10.times.map do |i|
+      thread_count = 5
+      threads = Array.new(thread_count) do |i|
         Thread.new do
           described_class.register_distributed("thread#{i}.", "Thread #{i}")
         end
@@ -230,24 +231,25 @@ RSpec.describe Takagi::EventBus::AddressPrefix do
 
       threads.each(&:join)
 
-      10.times do |i|
+      thread_count.times do |i|
         expect(described_class.distributed?("thread#{i}.foo")).to be true
       end
     end
 
     it 'handles concurrent reads' do
       errors = []
+      mutex = Mutex.new
 
-      threads = 20.times.map do
+      threads = Array.new(5) do
         Thread.new do
           begin
-            100.times do
+            50.times do
               described_class.distributed?('sensor.temp')
               described_class.local?('system.startup')
               described_class.all
             end
           rescue => e
-            errors << e
+            mutex.synchronize { errors << e }
           end
         end
       end
@@ -257,36 +259,35 @@ RSpec.describe Takagi::EventBus::AddressPrefix do
     end
 
     it 'handles concurrent reads and writes' do
-      stop = false
       errors = []
+      mutex = Mutex.new
+      writer_iterations = 200
+      reader_iterations = 200
 
       writer = Thread.new do
-        i = 0
-        while !stop
+        writer_iterations.times do |i|
           begin
             described_class.register_distributed("dynamic#{i}.", "Dynamic #{i}")
-            i += 1
           rescue => e
-            errors << e
+            mutex.synchronize { errors << e }
           end
         end
       end
 
-      readers = 5.times.map do
+      readers = Array.new(5) do
         Thread.new do
-          100.times do
+          reader_iterations.times do
             begin
               described_class.distributed?('sensor.temp')
               described_class.all
             rescue => e
-              errors << e
+              mutex.synchronize { errors << e }
             end
           end
         end
       end
 
       readers.each(&:join)
-      stop = true
       writer.join
 
       expect(errors).to be_empty

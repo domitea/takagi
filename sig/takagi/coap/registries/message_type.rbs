@@ -1,0 +1,53 @@
+module Takagi
+  module CoAP
+    module Registries
+      # CoAP Message Type Registry (RFC 7252 §3)
+      #
+      # Extensible registry for CoAP message types.
+      #
+      # @example Using predefined types
+      #   Takagi::CoAP::Registries::MessageType::CONFIRMABLE  # => 0
+      #   Takagi::CoAP::Registries::MessageType::ACK          # => 2
+      #
+      # @example Looking up type names
+      #   Takagi::CoAP::Registries::MessageType.name_for(0)  # => "Confirmable"
+      class MessageType < Base
+        # Aliases for convenience
+        CON: untyped
+
+        NON: untyped
+
+        ACK: untyped
+
+        RST: untyped
+
+        # Check if type is confirmable
+        # @param type [Integer] Message type
+        # @return [Boolean] true if confirmable
+        def self.confirmable?: (untyped type) -> untyped
+
+        # Check if type is non-confirmable
+        # @param type [Integer] Message type
+        # @return [Boolean] true if non-confirmable
+        def self.non_confirmable?: (untyped type) -> untyped
+
+        # Check if type is acknowledgement
+        # @param type [Integer] Message type
+        # @return [Boolean] true if acknowledgement
+        def self.acknowledgement?: (untyped type) -> untyped
+
+        alias self.ack? self.acknowledgement?
+
+        # Check if type is reset
+        # @param type [Integer] Message type
+        # @return [Boolean] true if reset
+        def self.reset?: (untyped type) -> untyped
+
+        # Check if type is valid
+        # @param type [Integer] Message type
+        # @return [Boolean] true if valid
+        def self.valid?: (untyped type) -> untyped
+      end
+    end
+  end
+end

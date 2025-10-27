@@ -1,0 +1,36 @@
+module Takagi
+  module Observer
+    # Lightweight CoAP observe client for integration testing.
+    class Client
+      @uri: untyped
+
+      @token: untyped
+
+      @socket: untyped
+
+      @on_notify: untyped
+
+      @running: untyped
+
+      @thread: untyped
+
+      def initialize: (untyped uri) -> void
+
+      def on_notify: () { (?) -> untyped } -> untyped
+
+      def subscribe: () -> untyped
+
+      def stop: () -> untyped
+
+      alias close stop
+
+      private
+
+      def send_observe_request: () -> untyped
+
+      def listen_for_notifications: () -> untyped
+
+      def handle_notification_iteration: () -> untyped
+    end
+  end
+end

@@ -1,0 +1,71 @@
+module Takagi
+  # Registry for CoAP server implementations
+  #
+  # Allows registering different protocol implementations (UDP, TCP, DTLS, QUIC, etc.)
+  # without modifying core code. Follows the Open/Closed Principle.
+  #
+  # @example Registering a server
+  #   ServerRegistry.register(:udp, Server::Udp)
+  #   ServerRegistry.register(:tcp, Server::Tcp)
+  #
+  # @example Building a server
+  #   server = ServerRegistry.build(:tcp, port: 5683, worker_threads: 4)
+  #
+  # @example Adding a custom protocol
+  #   class MyCustomServer
+  #     def initialize(port:, **options)
+  #       # ...
+  #     end
+  #   end
+  #   ServerRegistry.register(:custom, MyCustomServer)
+  class ServerRegistry
+    self.@servers: untyped
+
+    self.@mutex: untyped
+
+    class ProtocolNotFoundError < StandardError
+    end
+
+    # Register a server implementation for a protocol
+    #
+    # @param protocol [Symbol] Protocol identifier (:udp, :tcp, :dtls, etc.)
+    # @param klass [Class] Server class that responds to .new
+    # @param options [Hash] Optional metadata (description, rfc, etc.)
+    #
+    # @example
+    #   ServerRegistry.register(:udp, Server::Udp, rfc: 'RFC 7252')
+    #   ServerRegistry.register(:tcp, Server::Tcp, rfc: 'RFC 8323')
+    def self.register: (untyped protocol, untyped klass, **untyped options) -> untyped
+
+    # Build a server instance for the given protocol
+    #
+    # @param protocol [Symbol] Protocol identifier
+    # @param options [Hash] Options to pass to server constructor
+    # @return [Object] Server instance
+    # @raise [ProtocolNotFoundError] If protocol is not registered
+    #
+    # @example
+    #   server = ServerRegistry.build(:tcp, port: 5683, worker_threads: 4)
+    def self.build: (untyped protocol, **untyped options) -> untyped
+
+    # Check if a protocol is registered
+    #
+    # @param protocol [Symbol] Protocol identifier
+    # @return [Boolean] true if registered
+    def self.registered?: (untyped protocol) -> untyped
+
+    # Get all registered protocols
+    #
+    # @return [Array<Symbol>] List of protocol identifiers
+    def self.protocols: () -> untyped
+
+    # Get metadata for a protocol
+    #
+    # @param protocol [Symbol] Protocol identifier
+    # @return [Hash, nil] Metadata hash or nil if not found
+    def self.metadata_for: (untyped protocol) -> untyped
+
+    # Clear all registrations (useful for testing)
+    def self.clear!: () -> untyped
+  end
+end

@@ -52,6 +52,10 @@ module Takagi
           @mutex.synchronize { @messages.clear }
         end
 
+        def empty?
+          size.zero?
+        end
+
         # Clean expired messages based on TTL
         def clean_expired(ttl)
           @mutex.synchronize do
