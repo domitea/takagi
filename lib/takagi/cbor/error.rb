@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+
+module Takagi
+  module CBOR
+    # Base error for all CBOR-related errors
+    class Error < StandardError; end
+
+    # Raised when encoding fails
+    class EncodeError < Error; end
+
+    # Raised when decoding fails
+    class DecodeError < Error; end
+
+    # Raised when encountering unsupported CBOR features
+    class UnsupportedError < Error; end
+  end
+end

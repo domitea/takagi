@@ -1,0 +1,57 @@
+module Takagi
+  module Core
+    # Encapsulates CoRE Link Format attribute handling for a single route.
+    # The DSL is shared between request-time handlers and boot-time helpers,
+    # so changes applied here are idempotent and safe to call repeatedly.
+    class AttributeSet
+      @metadata: untyped
+
+      @overrides: untyped
+
+      CONTENT_FORMATS: { "text/plain" => 0, "application/link-format" => 40, "application/xml" => 41, "application/octet-stream" => 42, "application/exi" => 47, "application/json" => 50, "application/cbor" => 60 }
+
+      REMOVE: untyped
+
+      attr_reader metadata: untyped
+
+      def initialize: (untyped metadata) -> void
+
+      # Evaluates a block that configures any mix of CoRE attributes.
+      # Accepts the same DSL as the runtime helpers exposed in RouteContext.
+      def core: () ?{ (?) -> untyped } -> (untyped | nil)
+
+      def ct: (untyped value) -> untyped
+
+      alias content_format ct
+
+      def sz: (untyped value) -> untyped
+
+      def title: (untyped value) -> untyped
+
+      def obs: (?bool value) -> untyped
+
+      alias observable obs
+
+      def rt: (*untyped values) -> untyped
+
+      def interface: (*untyped values) -> untyped
+
+      alias if_ interface
+
+      def attribute: (untyped name, untyped value) -> untyped
+
+      # Persists staged attribute overrides back onto the route metadata.
+      # Invoked automatically after request handling, but also exposed so
+      # callers (e.g. Takagi::Router#configure_core) can persist updates.
+      def apply!: () -> (nil | untyped)
+
+      private
+
+      def assign_list: (untyped key, untyped values) -> (nil | untyped)
+
+      def metadata_override: (untyped key, untyped value) -> untyped
+
+      def normalize_content_format: (untyped value) -> untyped
+    end
+  end
+end

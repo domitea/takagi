@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'uri'
+
 RSpec.describe Takagi::UdpClient do
   let(:server_uri) { 'coap://127.0.0.1:5683' }
 
@@ -153,6 +155,44 @@ RSpec.describe Takagi::UdpClient do
       # Should not have accumulated threads
       final_thread_count = Thread.list.size
       expect(final_thread_count).to be <= (initial_thread_count + 1) # Allow for small variance
+    end
+  end
+
+  describe '#request_simple' do
+    let(:uri) { URI.parse(server_uri) }
+    let(:message) { instance_double(Takagi::Message::Request, to_bytes: 'payload') }
+    let(:socket) { instance_double(UDPSocket) }
+
+    before do
+      allow(UDPSocket).to receive(:new).and_return(socket)
+      allow(socket).to receive(:send)
+      allow(socket).to receive(:close)
+      allow(socket).to receive(:closed?).and_return(false)
+      allow(socket).to receive(:recvfrom)
+    end
+
+    it 'respects the configured timeout before reading a response' do
+      client = described_class.new(server_uri, timeout: 0.25, use_retransmission: false)
+      allow(socket).to receive(:wait_readable).with(0.25).and_return(false)
+
+      expect do
+        client.send(:request_simple, message, uri)
+      end.to output(/Request timeout/).to_stdout
+
+      expect(socket).not_to have_received(:recvfrom)
+      client.close
+    end
+
+    it 'reads the response once the socket becomes readable' do
+      client = described_class.new(server_uri, timeout: 0.5, use_retransmission: false)
+      allow(socket).to receive(:wait_readable).and_return(true)
+      allow(socket).to receive(:recvfrom).and_return(['ok'])
+
+      expect do
+        client.send(:request_simple, message, uri)
+      end.to output("ok\n").to_stdout
+
+      client.close
     end
   end
 end

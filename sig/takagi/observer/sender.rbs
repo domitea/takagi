@@ -1,0 +1,12 @@
+module Takagi
+  module Observer
+    # Dispatches outbound notifications to subscribed observers.
+    class Sender
+      @sender: untyped
+
+      def initialize: () -> void
+
+      def send_packet: (untyped subscriber, untyped value) -> untyped
+    end
+  end
+end

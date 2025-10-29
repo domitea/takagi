@@ -1,0 +1,5 @@
+module Takagi
+  VERSION: "1.0.0"
+
+  NAME: "It works on my machine"
+end

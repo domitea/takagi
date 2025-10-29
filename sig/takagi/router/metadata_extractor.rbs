@@ -1,0 +1,71 @@
+module Takagi
+  class Router
+    # Handles metadata extraction from route handlers at boot time.
+    #
+    # Extracted from Router to follow Single Responsibility Principle.
+    # Executes route handlers in a special context to capture CoRE Link Format
+    # metadata defined via core blocks.
+    class MetadataExtractor
+      @logger: untyped
+
+      # @param logger [Logger] Logger instance for debugging
+      def initialize: (untyped logger) -> void
+
+      # Executes route handler in metadata extraction mode to capture core block attributes
+      # This allows defining metadata inline with the handler for better DX
+      #
+      # @param entry [RouteEntry] The route entry to extract metadata from
+      def extract: (untyped entry) -> (nil | untyped)
+
+      # Special context for boot-time metadata extraction
+      # Uses entry's AttributeSet directly (safe because boot-time is single-threaded)
+      #
+      # Note: This class inherits from Takagi::Router::RouteContext, but since this file
+      # is loaded before RouteContext is defined, we define it as a placeholder here
+      # and will reopen it after Router is loaded.
+      class MetadataExtractionContext
+        @entry: untyped
+
+        @request: untyped
+
+        @params: untyped
+
+        @receiver: untyped
+
+        # Use entry's AttributeSet directly for boot-time extraction
+        # This is safe because metadata extraction runs once at boot time (single-threaded)
+        @core_attributes: untyped
+
+        include Takagi::Helpers
+
+        extend Forwardable
+
+        attr_reader request: untyped
+
+        attr_reader params: untyped
+
+        def initialize: (untyped entry, untyped request, untyped params, untyped receiver) -> void
+
+        def run: (untyped block) -> untyped
+
+        private
+
+        # Delegates method calls to the receiver (application instance)
+        def method_missing: (untyped name, *untyped) ?{ (?) -> untyped } -> untyped
+
+        # Required pair for method_missing
+        def respond_to_missing?: (untyped name, ?bool include_private) -> untyped
+      end
+
+      # Mock request object used during metadata extraction
+      # Provides minimal interface to prevent errors when handlers are executed at boot time
+      class MetadataExtractionRequest
+        def to_response: (*untyped _args) -> nil
+
+        def method_missing: (untyped _name, *untyped _args) { (?) -> untyped } -> nil
+
+        def respond_to_missing?: (untyped _name, ?bool _include_private) -> true
+      end
+    end
+  end
+end

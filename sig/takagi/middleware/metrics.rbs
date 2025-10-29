@@ -1,0 +1,15 @@
+module Takagi
+  module Middleware
+    class Metrics
+      @metrics: untyped
+
+      @mutex: untyped
+
+      attr_reader metrics: untyped
+
+      def initialize: () -> void
+
+      def call: (untyped request) { (untyped) -> untyped } -> untyped
+    end
+  end
+end

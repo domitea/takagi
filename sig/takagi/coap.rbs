@@ -1,0 +1,24 @@
+module Takagi
+  # CoAP Protocol implementation following RFC 7252 and related RFCs.
+  #
+  # This module provides a registry-based system for CoAP protocol constants,
+  # allowing plugins and extensions to register additional constants without
+  # modifying core code.
+  #
+  # @example Registering a custom response code
+  #   Takagi::CoAP::Response.register(231, '7.01 Custom Code', :custom_code)
+  #
+  # @example Using registered constants
+  #   code = Takagi::CoAP::Response::CONTENT  # => 69
+  #   Takagi::CoAP::Response.name_for(69)      # => "2.05 Content"
+  module CoAP
+    # Default CoAP port (RFC 7252 §6.1)
+    DEFAULT_PORT: 5683
+
+    # Default CoAPS (secure) port (RFC 7252 §6.2)
+    DEFAULT_SECURE_PORT: 5684
+
+    # CoAP version (RFC 7252 §3)
+    VERSION: 1
+  end
+end

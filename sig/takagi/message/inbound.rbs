@@ -1,0 +1,76 @@
+module Takagi
+  module Message
+    # Class for inbound message that is coming to server
+    class Inbound < Base
+      @method: untyped
+
+      @response_code: untyped
+
+      @uri: untyped
+
+      attr_reader method: untyped
+
+      attr_reader uri: untyped
+
+      attr_reader response_code: untyped
+
+      def initialize: (untyped data) -> void
+
+      def to_response: (untyped code, untyped payload, ?options: ::Hash[untyped, untyped]) -> untyped
+
+      def parse_coap_uri: () -> untyped
+
+      # Get CoAP option by number
+      # @param option_number [Integer] The CoAP option number
+      # @return [Object, nil] The option value
+      def option: (untyped option_number) -> untyped
+
+      # Check if request has a specific CoAP option
+      # @param option_number [Integer] The CoAP option number
+      # @return [Boolean]
+      def option?: (untyped option_number) -> untyped
+
+      # Get Accept option
+      # @return [Integer, nil] The Accept content format
+      def accept: () -> untyped
+
+      # Check if request accepts a specific content format
+      # @param format [String, Integer] Format name or number
+      # @return [Boolean]
+      def accept?: (untyped format) -> (false | untyped)
+
+      # Get Content-Format option
+      # @return [Integer, nil] The Content-Format
+      def content_format: () -> untyped
+
+      # Get query parameters as a hash
+      # @return [Hash<String, String>]
+      def query_params: () -> (::Hash[untyped, untyped] | untyped)
+
+      # Check if request is a GET
+      # @return [Boolean]
+      def get?: () -> untyped
+
+      # Check if request is a POST
+      # @return [Boolean]
+      def post?: () -> untyped
+
+      # Check if request is a PUT
+      # @return [Boolean]
+      def put?: () -> untyped
+
+      # Check if request is a DELETE
+      # @return [Boolean]
+      def delete?: () -> untyped
+
+      # Check if request is an OBSERVE
+      # @return [Boolean]
+      def observe?: () -> untyped
+
+      private
+
+      # Convert content format name to number using CoAP registry
+      def content_format_to_number: (untyped format) -> untyped
+    end
+  end
+end

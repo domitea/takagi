@@ -1,0 +1,133 @@
+module Takagi
+  class EventBus
+    # Bounded message buffer for distributed addresses
+    # Stores recent messages in a ring buffer per address for replay on reconnection
+    #
+    # Features:
+    # - Bounded memory (max messages per address)
+    # - TTL-based expiration
+    # - Thread-safe
+    # - Zero external dependencies
+    # - Only buffers distributed addresses
+    #
+    # @example
+    #   buffer = MessageBuffer.new(max_messages: 100, ttl: 300)
+    #   buffer.store(address, message)
+    #   messages = buffer.replay(address, since: Time.now - 60)
+    class MessageBuffer
+      @max_messages: untyped
+
+      @ttl: untyped
+
+      @buffers: untyped
+
+      @mutex: untyped
+
+      @enabled: untyped
+
+      @cleanup_thread: untyped
+
+      # Ring buffer for a single address
+      class RingBuffer
+        @max_size: untyped
+
+        @messages: untyped
+
+        @mutex: untyped
+
+        def initialize: (untyped max_size) -> void
+
+        def push: (untyped message) -> untyped
+
+        def messages_since: (?untyped? timestamp) -> untyped
+
+        def all_messages: () -> untyped
+
+        def size: () -> untyped
+
+        def clear: () -> untyped
+
+        def empty?: () -> untyped
+
+        # Clean expired messages based on TTL
+        def clean_expired: (untyped ttl) -> untyped
+      end
+
+      # @param max_messages [Integer] Maximum messages per address (default: 100)
+      # @param ttl [Integer] Time-to-live in seconds (default: 300 = 5 minutes)
+      def initialize: (?max_messages: ::Integer, ?ttl: ::Integer) -> void
+
+      # Store a message in the buffer
+      # Only stores distributed addresses to conserve memory
+      #
+      # @param address [String] Event address
+      # @param message [Message] Event message
+      def store: (untyped address, untyped message) -> (nil | untyped)
+
+      # Store a failed delivery for retry
+      # Used by CoAPBridge when network delivery fails
+      #
+      # @param address [String] Event address
+      # @param message [Message] Event message
+      # @param destination [String] Failed destination (for logging)
+      def store_failed: (untyped address, untyped message, ?untyped? destination) -> (nil | untyped)
+
+      # Replay messages for an address since a given timestamp
+      #
+      # @param address [String] Event address
+      # @param since [Time, nil] Return messages since this time (nil = all messages)
+      # @return [Array<Message>] Buffered messages
+      #
+      # @example Replay last 60 seconds
+      #   messages = buffer.replay('sensor.temperature.room1', since: Time.now - 60)
+      def replay: (untyped address, ?since: untyped?) -> untyped
+
+      # Get all buffered messages for an address
+      #
+      # @param address [String] Event address
+      # @return [Array<Message>] All buffered messages
+      def all: (untyped address) -> untyped
+
+      # Get buffer size for an address
+      #
+      # @param address [String] Event address
+      # @return [Integer] Number of buffered messages
+      def size: (untyped address) -> untyped
+
+      # Get total number of buffered messages across all addresses
+      #
+      # @return [Integer] Total buffered messages
+      def total_size: () -> untyped
+
+      # Clear buffer for an address
+      #
+      # @param address [String] Event address
+      def clear: (untyped address) -> untyped
+
+      # Clear all buffers
+      def clear_all: () -> untyped
+
+      # Enable message buffering
+      def enable: () -> untyped
+
+      # Disable message buffering
+      def disable: () -> untyped
+
+      # Check if buffering is enabled
+      def enabled?: () -> untyped
+
+      # Get statistics about buffering
+      #
+      # @return [Hash] Buffer statistics
+      def stats: () -> untyped
+
+      # Shutdown cleanup thread
+      def shutdown: () -> untyped
+
+      private
+
+      # Start background thread to clean expired messages
+      def start_cleanup_thread: () -> untyped
+    end
+  end
+end

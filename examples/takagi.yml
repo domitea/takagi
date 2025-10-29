@@ -1,0 +1,138 @@
+# Takagi Configuration Example
+# Place this file as takagi.yml in your project root
+
+# ============================================
+# Server Settings
+# ============================================
+port: 5683
+bind_address: "0.0.0.0"  # Bind to all interfaces (default)
+                          # Use "127.0.0.1" for local-only
+                          # Use specific IP for single interface
+server_name: "Takagi CoAP Server"
+
+# Number of processes (for multi-process mode)
+processes: 1
+
+# Number of threads per process
+threads: 4
+
+# Supported protocols
+protocols:
+  - udp
+  - tcp
+
+# ============================================
+# Logger Configuration
+# ============================================
+logger:
+  level: info  # debug, info, warn, error
+  output: stdout
+
+# ============================================
+# Observability
+# ============================================
+observability:
+  backends:
+    - memory
+    # - prometheus  # Uncomment for Prometheus metrics
+    # - statsd      # Uncomment for StatsD metrics
+
+# ============================================
+# EventBus Configuration
+# ============================================
+event_bus:
+  # Worker pool size for async message delivery
+  # Higher values = more concurrent message processing
+  # Lower values = less memory/CPU usage
+  ractors: 10
+
+  # Current state cache (LRUCache)
+  # Stores latest value per address for fast lookups
+  state_cache_size: 1000   # Max number of addresses
+  state_cache_ttl: 3600    # Seconds (1 hour)
+
+  # Observer cleanup settings
+  # Removes stale CoAP observers periodically
+  cleanup_interval: 60     # Seconds between cleanup runs
+  max_observer_age: 600    # Seconds (10 minutes)
+
+  # ==========================================
+  # Message Buffering (for reliability)
+  # ==========================================
+  # Enable to buffer messages for late subscribers and reconnections
+  # Recommended for unreliable networks (WiFi, mesh, mobile)
+
+  message_buffering_enabled: false  # Set to true to enable
+
+  # When enabled:
+  message_buffer_max_messages: 100  # Messages per address
+  message_buffer_ttl: 300           # Seconds (5 minutes)
+
+# ============================================
+# Router Configuration
+# ============================================
+router:
+  # Default Content-Format when not specified
+  # 0  = text/plain
+  # 40 = application/link-format
+  # 41 = application/xml
+  # 42 = application/octet-stream
+  # 50 = application/json (default)
+  # 60 = application/cbor
+  default_content_format: 50
+
+# ============================================
+# Middleware Configuration
+# ============================================
+middleware:
+  # Enable/disable middleware globally
+  enabled: true
+
+  # Middleware stack (executed in order)
+  # Middleware wraps request/response processing
+  # First middleware in list runs first (outermost layer)
+  stack:
+    # Simple middleware (no options)
+    - Logging
+
+    # Middleware with options
+    - name: Caching
+      options:
+        ttl: 300  # Cache TTL in seconds
+
+    # Available built-in middleware:
+    # - Debugging: Debug logging for requests/responses
+    # - Logging: Request/response logging
+    # - Caching: Simple in-memory cache
+    # - RateLimiting: Rate limit requests (options: max_requests, window)
+    # - Metrics: Collect metrics (options: backend)
+    # - Authentication: Token-based auth (options: tokens, realm)
+
+    # Example: Rate Limiting
+    # - name: RateLimiting
+    #   options:
+    #     max_requests: 100
+    #     window: 60  # seconds
+
+    # Example: Authentication
+    # - name: Authentication
+    #   options:
+    #     tokens:
+    #       - "secret-token-1"
+    #       - "secret-token-2"
+    #     realm: "CoAP API"
+
+    # Example: Custom middleware (full class name)
+    # - name: MyApp::CustomMiddleware
+    #   options:
+    #     custom_option: value
+
+# ============================================
+# Custom Application Settings
+# ============================================
+# Add any custom settings here - accessible via Takagi.config[:key]
+custom:
+  # Example custom settings
+  app_name: "My IoT Application"
+  max_devices: 100
+  device_timeout: 30

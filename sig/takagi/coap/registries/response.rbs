@@ -1,0 +1,52 @@
+module Takagi
+  module CoAP
+    module Registries
+      # CoAP Response Code Registry (RFC 7252 §12.1.2)
+      #
+      # Extensible registry for CoAP response codes.
+      # Plugins can register custom response codes without modifying core code.
+      #
+      # @example Using predefined codes
+      #   Takagi::CoAP::Registries::Response::CONTENT    # => 69 (2.05)
+      #   Takagi::CoAP::Registries::Response::NOT_FOUND  # => 132 (4.04)
+      #
+      # @example Registering a custom code
+      #   Takagi::CoAP::Registries::Response.register(231, '7.07 Custom', :custom)
+      #   Takagi::CoAP::Registries::Response::CUSTOM  # => 231
+      #
+      # @example Looking up code names
+      #   Takagi::CoAP::Registries::Response.name_for(69)  # => "2.05 Content"
+      class Response < Base
+        # Get the response class (2, 4, 5, etc.)
+        # @param code [Integer] Response code
+        # @return [Integer] Class number
+        def self.class_for: (untyped code) -> untyped
+
+        # Check if code is a success (2.xx)
+        # @param code [Integer] Response code
+        # @return [Boolean] true if success
+        def self.success?: (untyped code) -> untyped
+
+        # Check if code is a client error (4.xx)
+        # @param code [Integer] Response code
+        # @return [Boolean] true if client error
+        def self.client_error?: (untyped code) -> untyped
+
+        # Check if code is a server error (5.xx)
+        # @param code [Integer] Response code
+        # @return [Boolean] true if server error
+        def self.server_error?: (untyped code) -> untyped
+
+        # Check if code is any error (4.xx or 5.xx)
+        # @param code [Integer] Response code
+        # @return [Boolean] true if error
+        def self.error?: (untyped code) -> untyped
+
+        # Check if code is a valid response code
+        # @param code [Integer] Code to check
+        # @return [Boolean] true if valid response code
+        def self.valid?: (untyped code) -> untyped
+      end
+    end
+  end
+end

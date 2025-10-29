@@ -1,0 +1,93 @@
+module Takagi
+  class EventBus
+    # CoAP Observe integration - maps events to CoAP resources
+    # Thread-safe with Mutex for resource registration
+    #
+    # Maps EventBus addresses to CoAP observable resources:
+    # - "sensor.temperature.room1" -> "/events/sensor/temperature/room1"
+    #
+    # @example
+    #   CoAPBridge.register_observable_resource('sensor.temp.room1', app)
+    #   CoAPBridge.publish_to_observers('sensor.temp.room1', message)
+    class CoAPBridge
+      self.@registered_resources: untyped
+
+      self.@mutex: untyped
+
+      # Convert event address to CoAP path
+      # @param address [String] Event address (e.g., "sensor.temperature.room1")
+      # @return [String] CoAP path (e.g., "/events/sensor/temperature/room1")
+      #
+      # @example
+      #   CoAPBridge.address_to_path('sensor.temperature.room1')
+      #   # => "/events/sensor/temperature/room1"
+      def self.address_to_path: (untyped address) -> ::String
+
+      # Convert CoAP path to event address
+      # @param path [String] CoAP path (e.g., "/events/sensor/temperature/room1")
+      # @return [String] Event address (e.g., "sensor.temperature.room1")
+      #
+      # @example
+      #   CoAPBridge.path_to_address('/events/sensor/temperature/room1')
+      #   # => "sensor.temperature.room1"
+      def self.path_to_address: (untyped path) -> untyped
+
+      # Auto-register observable CoAP resource (thread-safe)
+      # Creates a CoAP observable endpoint that returns current state
+      #
+      # Uses AddressPrefix registry to determine if address should be distributed
+      #
+      # @param address [String] Event address
+      # @param app [Class] Application class (must respond to #observable)
+      # @return [Boolean] True if registered, false if already exists
+      #
+      # @example
+      #   CoAPBridge.register_observable_resource('sensor.temp.room1', MyApp)
+      def self.register_observable_resource: (untyped address, untyped app) -> (false | untyped)
+
+      # Publish event to all CoAP observers
+      # Notifies all observers subscribed via CoAP Observe
+      #
+      # @param address [String] Event address
+      # @param message [EventBus::Message] Event message
+      #
+      # @example
+      #   message = EventBus::Message.new('sensor.temp.room1', { value: 25.5 })
+      #   CoAPBridge.publish_to_observers('sensor.temp.room1', message)
+      def self.publish_to_observers: (untyped address, untyped message) -> untyped
+
+      # Subscribe to remote event via CoAP Observe
+      # @param address [String] Event address
+      # @param node_url [String] Remote node URL (e.g., 'coap://building-a:5683')
+      # @yield [message] Block called when remote notification received
+      # @return [String] Subscription ID
+      #
+      # @example
+      #   id = CoAPBridge.subscribe_remote('sensor.temp.buildingA', 'coap://building-a:5683') do |msg|
+      #     puts "Remote temp: #{msg.body[:value]}"
+      #   end
+      def self.subscribe_remote: (untyped address, untyped node_url) -> untyped
+
+      # Check if resource is registered
+      # @param address [String] Event address
+      # @return [Boolean]
+      def self.registered?: (untyped address) -> untyped
+
+      # Get all registered resource addresses
+      # @return [Array<String>]
+      def self.registered_addresses: () -> untyped
+
+      # Get count of registered resources
+      # @return [Integer]
+      def self.registered_count: () -> untyped
+
+      # Unregister a resource (for testing)
+      # @param address [String] Event address
+      # @return [Boolean] True if was registered, false otherwise
+      def self.unregister: (untyped address) -> untyped
+
+      # Clear all registrations (for testing)
+      def self.clear: () -> untyped
+    end
+  end
+end

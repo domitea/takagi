@@ -1,0 +1,36 @@
+module Takagi
+  # Keeps track of observers and broadcasts state changes to interested parties.
+  class ObserveRegistry
+    self.@subscriptions: untyped
+
+    self.@mutex: untyped
+
+    self.@sender: untyped
+
+    attr_reader self.subscriptions: untyped
+
+    def self.subscribe: (untyped path, untyped subscriber) -> untyped
+
+    def self.unsubscribe: (untyped path, untyped token) -> untyped
+
+    def self.notify: (untyped path, untyped new_value) -> (nil | untyped)
+
+    def self.sender: () -> untyped
+
+    def self.subscription_paths: () -> untyped
+
+    def self.cleanup_stale_observers: (max_age: untyped, ?now: untyped) -> untyped
+
+    private
+
+    def self.should_notify?: (untyped subscription, untyped new_value) -> (true | untyped)
+
+    def self.delta_exceeded?: (untyped last_value, untyped new_value, untyped threshold) -> untyped
+
+    def self.deliver_notification: (untyped subscription, untyped path, untyped new_value) -> untyped
+
+    def self.update_sequence: (untyped subscription, untyped new_value) -> untyped
+
+    def self.stale_subscription?: (untyped subscription, untyped cutoff) -> (false | untyped)
+  end
+end

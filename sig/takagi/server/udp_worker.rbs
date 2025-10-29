@@ -1,0 +1,42 @@
+module Takagi
+  module Server
+    # Handles incoming UDP messages on behalf of the master Udp server.
+    class UdpWorker
+      @socket: untyped
+
+      @middleware_stack: untyped
+
+      @sender: untyped
+
+      @logger: untyped
+
+      @port: untyped
+
+      @threads: untyped
+
+      @dedup_cache: untyped
+
+      def initialize: (socket: untyped, middleware_stack: untyped, **untyped options) -> void
+
+      def run: () -> untyped
+
+      private
+
+      def process_loop: (untyped queue) -> untyped
+
+      def spawn_thread: (untyped queue) -> untyped
+
+      def handle_request: (untyped request, untyped addr) -> untyped
+
+      def log_inbound_request: (untyped inbound_request) -> untyped
+
+      def immediate_response: (untyped inbound_request) -> (untyped | nil)
+
+      def log_middleware_result: (untyped result) -> (nil | untyped)
+
+      def build_response: (untyped inbound_request, untyped result) -> untyped
+
+      def transmit: (untyped response, untyped addr) -> untyped
+    end
+  end
+end

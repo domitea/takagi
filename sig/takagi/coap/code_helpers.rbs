@@ -1,0 +1,91 @@
+module Takagi
+  module CoAP
+    # Utility methods for working with CoAP codes.
+    #
+    # Provides conversion between different code representations and
+    # lookups across all registries.
+    module CodeHelpers
+      # Convert a code to its human-readable string representation
+      #
+      # @param code [Integer, String, Symbol] Code to convert
+      # @return [String] Human-readable code string
+      #
+      # @example
+      #   CodeHelpers.to_string(69)      # => "2.05 Content"
+      #   CodeHelpers.to_string(:get)    # => "GET"
+      #   CodeHelpers.to_string("2.05")  # => "2.05 Content"
+      def self.to_string: (untyped code) -> untyped
+
+      # Convert a code to its numeric representation
+      #
+      # @param code [Integer, String, Symbol] Code to convert
+      # @return [Integer] Numeric code
+      #
+      # @example
+      #   CodeHelpers.to_numeric(:get)       # => 1
+      #   CodeHelpers.to_numeric("2.05")     # => 69
+      #   CodeHelpers.to_numeric("2.05 Content")   # => 69
+      #   CodeHelpers.to_numeric(:content)   # => 69
+      def self.to_numeric: (untyped code) -> untyped
+
+      # Convert numeric code to dotted string format (e.g., 69 => "2.05")
+      #
+      # @param code [Integer] Numeric code
+      # @return [String] Dotted format string
+      def self.numeric_to_string: (untyped code) -> ::String
+
+      # Convert dotted string to numeric code (e.g., "2.05" => 69)
+      #
+      # @param code_string [String] Dotted format string
+      # @return [Integer] Numeric code
+      def self.string_to_numeric: (untyped code_string) -> (0 | untyped)
+
+      # Check if a code represents success
+      #
+      # @param code [Integer, String, Symbol] Code to check
+      # @return [Boolean] true if success code (2.xx)
+      def self.success?: (untyped code) -> untyped
+
+      # Check if a code represents an error
+      #
+      # @param code [Integer, String, Symbol] Code to check
+      # @return [Boolean] true if error code (4.xx or 5.xx)
+      def self.error?: (untyped code) -> untyped
+
+      # Check if a code represents a client error
+      #
+      # @param code [Integer, String, Symbol] Code to check
+      # @return [Boolean] true if client error (4.xx)
+      def self.client_error?: (untyped code) -> untyped
+
+      # Check if a code represents a server error
+      #
+      # @param code [Integer, String, Symbol] Code to check
+      # @return [Boolean] true if server error (5.xx)
+      def self.server_error?: (untyped code) -> untyped
+
+      # Lookup code in all registries
+      #
+      # @param code [Integer, String, Symbol] Code to lookup
+      # @return [Hash, nil] Registry information
+      def self.lookup: (untyped code) -> (nil | { value: untyped, string: untyped, name: untyped, type: untyped, rfc: untyped })
+
+      # Get the type of code (method, response, or unknown)
+      #
+      # @param code [Integer] Numeric code
+      # @return [Symbol] :method, :response, or :unknown
+      def self.code_type: (untyped code) -> (:method | :response | :unknown)
+
+      # Find RFC reference for a code
+      #
+      # @param code [Integer] Numeric code
+      # @return [String, nil] RFC reference
+      def self.find_rfc: (untyped code) -> untyped
+
+      # Get all registered codes across all registries
+      #
+      # @return [Hash] Map of value => name for all codes
+      def self.all: () -> untyped
+    end
+  end
+end

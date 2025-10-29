@@ -1,0 +1,7 @@
+module Takagi
+  module Middleware
+    class Logging
+      def call: (untyped request) { (untyped) -> untyped } -> untyped
+    end
+  end
+end

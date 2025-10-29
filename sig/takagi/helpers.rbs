@@ -1,0 +1,33 @@
+module Takagi
+  # Helper methods for route handlers to improve DX
+  #
+  # Dynamically generates response helper methods from CoAP::Response registry:
+  # - Success methods (2.xx): created(data = {}), changed(data = {}), etc.
+  # - Error methods (4.xx, 5.xx): bad_request(message = ...), not_found(message = ...), etc.
+  #
+  # @example Success response
+  #   created({ id: 123, name: 'Resource' })
+  #
+  # @example Error response
+  #   bad_request('Invalid input')
+  #   unauthorized({ error: 'Token expired' })
+  module Helpers
+    # Returns a JSON response with 2.05 Content status
+    # @param data [Hash] The data to return as JSON
+    # @return [Hash] The data hash
+    def json: (?::Hash[untyped, untyped] data) -> untyped
+
+    # Validates that required parameters are present
+    # @param required_params [Array<Symbol>] List of required parameter names
+    # @raise [StandardError] If any required parameter is missing
+    def validate_params: (*untyped required_params) -> (nil | untyped)
+
+    # Halts execution and returns the given response
+    # Useful for early returns
+    # @param response [Takagi::Message::Outbound, Hash] The response to return
+    def halt: (untyped response) -> untyped
+
+    # Alias for internal_server_error (more concise)
+    alias server_error internal_server_error
+  end
+end

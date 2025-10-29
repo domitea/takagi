@@ -1,0 +1,18 @@
+module Takagi
+  module Observer
+    # Periodically notifies observers by re-running registered handlers.
+    class Watcher
+      @interval: untyped
+
+      @running: untyped
+
+      @thread: untyped
+
+      def initialize: (?interval: ::Integer) -> void
+
+      def start: () -> untyped
+
+      def stop: () -> untyped
+    end
+  end
+end

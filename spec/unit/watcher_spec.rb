@@ -14,7 +14,7 @@ RSpec.describe Takagi::Observer::Watcher do
   end
 
   it "calls notify during loop" do
-    allow(Takagi::ObserveRegistry).to receive(:subscriptions).and_return({})
+    allow(Takagi::ObserveRegistry).to receive(:subscription_paths).and_return([])
     allow(Takagi::ObserveRegistry).to receive(:notify)
 
     thread = watcher.start
@@ -23,6 +23,6 @@ RSpec.describe Takagi::Observer::Watcher do
     watcher.stop
     thread.join
 
-    expect(Takagi::ObserveRegistry).to have_received(:subscriptions).at_least(:once)
+    expect(Takagi::ObserveRegistry).to have_received(:subscription_paths).at_least(:once)
   end
 end

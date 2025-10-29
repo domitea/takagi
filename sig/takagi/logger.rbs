@@ -1,0 +1,17 @@
+module Takagi
+  class Logger
+    @logger: untyped
+
+    def initialize: (?log_output: untyped, ?level: untyped) -> void
+
+    def set_level: (untyped level) -> untyped
+
+    def info: (untyped message) -> untyped
+
+    def warn: (untyped message) -> untyped
+
+    def debug: (untyped message) -> untyped
+
+    def error: (untyped message) -> untyped
+  end
+end

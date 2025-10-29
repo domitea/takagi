@@ -1,0 +1,95 @@
+module Takagi
+  module CoAP
+    module Registries
+      # Base class for extensible constant registries.
+      #
+      # Provides a pattern for registering CoAP protocol constants with:
+      # - Numeric value
+      # - Human-readable name
+      # - Symbol accessor (optional)
+      #
+      # This allows plugins to extend the protocol without modifying core code.
+      #
+      # @example Creating a custom registry
+      #   class MyRegistry < Registries::Base
+      #     register(1, 'First Value', :first)
+      #     register(2, 'Second Value', :second)
+      #   end
+      #
+      #   MyRegistry::FIRST   # => 1
+      #   MyRegistry.name_for(1)  # => "First Value"
+      #   MyRegistry.all      # => {1 => "First Value", 2 => "Second Value"}
+      class Base
+        self.@registry: untyped
+
+        self.@reverse_registry: untyped
+
+        # Register a new constant in the registry
+        #
+        # @param value [Integer] Numeric value of the constant
+        # @param name [String] Human-readable name
+        # @param symbol [Symbol, nil] Optional symbol for constant access
+        # @param rfc [String, nil] Optional RFC reference
+        #
+        # @example
+        #   register(69, '2.05 Content', :content, rfc: 'RFC 7252 §5.9.1.4')
+        def self.register: (untyped value, untyped name, ?untyped? symbol, ?rfc: untyped?) -> untyped
+
+        # Get human-readable name for a value
+        #
+        # @param value [Integer] The numeric value
+        # @return [String, nil] The name, or nil if not found
+        def self.name_for: (untyped value) -> untyped
+
+        # Get numeric value for a name or symbol
+        #
+        # @param key [String, Symbol] The name or symbol
+        # @return [Integer, nil] The value, or nil if not found
+        def self.value_for: (untyped key) -> untyped
+
+        # Get RFC reference for a value
+        #
+        # @param value [Integer] The numeric value
+        # @return [String, nil] The RFC reference, or nil if not found
+        def self.rfc_for: (untyped value) -> untyped
+
+        # Check if a value is registered
+        #
+        # @param value [Integer] The value to check
+        # @return [Boolean] true if registered
+        def self.registered?: (untyped value) -> untyped
+
+        # Get all registered constants
+        #
+        # @return [Hash] Map of value => name
+        def self.all: () -> untyped
+
+        # Iterate over registered values
+        #
+        # @yield [Integer] each registered numeric value
+        # @return [Enumerator] if no block given
+        def self.each_value: () ?{ (?) -> untyped } -> untyped
+
+        # Get all registered values
+        #
+        # @return [Array<Integer>] Array of all values
+        def self.values: () -> untyped
+
+        # Get registry metadata for a value
+        #
+        # @param value [Integer] The numeric value
+        # @return [Hash, nil] Full metadata hash
+        def self.metadata_for: (untyped value) -> untyped
+
+        # Clear all registrations (useful for testing)
+        def self.clear!: () -> untyped
+
+        private
+
+        def self.registry: () -> untyped
+
+        def self.reverse_registry: () -> untyped
+      end
+    end
+  end
+end

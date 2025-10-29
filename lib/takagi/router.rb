@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 require 'singleton'
+require 'forwardable'
 require_relative 'core/attribute_set'
 require_relative 'helpers'
+require_relative 'router/route_matcher'
+require_relative 'router/metadata_extractor'
 
 module Takagi
   class Router
@@ -49,9 +52,19 @@ module Takagi
     # Provides the execution context for route handlers, exposing helper
     # methods for configuring CoRE Link Format attributes via a small DSL.
     class RouteContext
+      extend Forwardable
       include Takagi::Helpers
 
       attr_reader :request, :params
+
+      # Delegate CoRE attribute methods to @core_attributes
+      def_delegators :@core_attributes, :core, :metadata, :attribute
+      def_delegators :@core_attributes, :ct, :sz, :title, :obs, :rt, :interface
+
+      # Aliases for common methods
+      alias content_format ct
+      alias observable obs
+      alias if_ interface
 
       def initialize(entry, request, params, receiver)
         @entry = entry
@@ -61,10 +74,6 @@ module Takagi
         # Create a fresh AttributeSet for this request to avoid cross-request state sharing
         # Initialize it with a copy of the entry's current metadata
         @core_attributes = Core::AttributeSet.new(@entry.metadata.dup)
-      end
-
-      def metadata
-        @core_attributes.metadata
       end
 
       def run(block)
@@ -86,41 +95,6 @@ module Takagi
         result
       ensure
         @core_attributes.apply!
-      end
-
-      def core(&block)
-        @core_attributes.core(&block)
-      end
-
-      def ct(value)
-        @core_attributes.ct(value)
-      end
-      alias content_format ct
-
-      def sz(value)
-        @core_attributes.sz(value)
-      end
-
-      def title(value)
-        @core_attributes.title(value)
-      end
-
-      def obs(value = true)
-        @core_attributes.obs(value)
-      end
-      alias observable obs
-
-      def rt(*values)
-        @core_attributes.rt(*values)
-      end
-
-      def interface(*values)
-        @core_attributes.interface(*values)
-      end
-      alias if_ interface
-
-      def attribute(name, value)
-        @core_attributes.attribute(name, value)
       end
 
       private
@@ -146,6 +120,8 @@ module Takagi
       @routes = {}
       @routes_mutex = Mutex.new # Protects route modifications in multithreaded environments
       @logger = Takagi.logger
+      @route_matcher = RouteMatcher.new(@logger)
+      @metadata_extractor = MetadataExtractor.new(@logger)
     end
 
     # Registers a new route for a given HTTP method and path
@@ -163,32 +139,15 @@ module Takagi
       end
     end
 
-    # Registers a GET route
-    # @param path [String] The URL path
-    # @param block [Proc] The handler function
-    def get(path, metadata: {}, &block)
-      add_route('GET', path, metadata: metadata, &block)
-    end
+    # Dynamically define route registration methods from CoAP::Method registry
+    # Generates: get, post, put, delete, fetch, etc.
+    CoAP::Method.all.each_value do |method_name|
+      method_string = method_name.split.first # Extract 'GET' from 'GET'
+      method_symbol = method_string.downcase.to_sym
 
-    # Registers a POST route
-    # @param path [String] The URL path
-    # @param block [Proc] The handler function
-    def post(path, metadata: {}, &block)
-      add_route('POST', path, metadata: metadata, &block)
-    end
-
-    # Registers a PUT route
-    # @param path [String] The URL path
-    # @param block [Proc] The handler function
-    def put(path, metadata: {}, &block)
-      add_route('PUT', path, metadata: metadata, &block)
-    end
-
-    # Registers a DELETE route
-    # @param path [String] The URL path
-    # @param block [Proc] The handler function
-    def delete(path, metadata: {}, &block)
-      add_route('DELETE', path, metadata: metadata, &block)
+      define_method(method_symbol) do |path, metadata: {}, &block|
+        add_route(method_string, path, metadata: metadata, &block)
+      end
     end
 
     # Registers a OBSERVE route
@@ -264,55 +223,12 @@ module Takagi
     end
 
     # Matches dynamic routes that contain parameters (e.g., `/users/:id`)
+    # Delegates to RouteMatcher for the actual matching logic
     # @param method [String] HTTP method
     # @param path [String] Request path
-    # @return [Array(Proc, Hash)] Matched route handler and extracted parameters
+    # @return [Array(RouteEntry, Hash)] Matched route entry and extracted parameters
     def match_dynamic_route(method, path)
-      matched_route = locate_dynamic_route(method, path)
-      return matched_route if matched_route
-
-      @logger.debug 'No route matched!'
-      [nil, {}]
-    end
-
-    def locate_dynamic_route(method, path)
-      @routes.each_value do |entry|
-        route_method = entry.method
-        route_path = entry.path
-        next unless route_method == method
-
-        params = extract_dynamic_params(route_path, path)
-        next unless params
-
-        @logger.debug "Match found! Params: #{params.inspect}"
-        return [entry, params]
-      end
-      nil
-    end
-
-    def extract_dynamic_params(route_path, path)
-      route_parts = route_path.split('/')
-      path_parts = path.split('/')
-      return unless route_parts.length == path_parts.length
-
-      params = {}
-      matched = true
-
-      route_parts.each_with_index do |part, index|
-        if part.start_with?(':')
-          params[part[1..].to_sym] = path_parts[index]
-        elsif part != path_parts[index]
-          log_no_match(params, path)
-          matched = false
-          break
-        end
-      end
-
-      matched ? params : nil
-    end
-
-    def log_no_match(params, path)
-      @logger.debug "No Match found! Params: #{params.inspect} to #{path}"
+      @route_matcher.match(@routes, method, path)
     end
 
     def build_route_entry(method, path, metadata, block)
@@ -349,65 +265,10 @@ module Takagi
     end
 
     # Executes route handler in metadata extraction mode to capture core block attributes
-    # This allows defining metadata inline with the handler for better DX
+    # Delegates to MetadataExtractor for the actual extraction logic
+    # @param entry [RouteEntry] The route entry to extract metadata from
     def extract_metadata_from_handler(entry)
-      # Skip metadata extraction for discovery routes to avoid deadlock
-      # Discovery routes access the router itself, which would cause a deadlock
-      # since we're already holding the routes_mutex. These routes declare
-      # their metadata explicitly via the metadata: parameter instead.
-      if entry.metadata[:discovery]
-        @logger.debug "Skipping metadata extraction for discovery route: #{entry.method} #{entry.path}"
-        return
-      end
-
-      # Create a mock request object that will be passed to the handler
-      mock_request = MetadataExtractionRequest.new
-
-      # Create a special extraction context that uses the entry's AttributeSet directly
-      # (This is safe because it runs once at boot time, not during concurrent requests)
-      context = MetadataExtractionContext.new(entry, mock_request, {}, entry.receiver)
-
-      # Execute the handler block - it may call core { ... } which updates the attribute_set
-      begin
-        context.run(entry.block)
-      rescue StandardError => e
-        # If the handler fails during metadata extraction (e.g., tries to access real data),
-        # that's okay - we only care about core blocks which should not throw errors
-        @logger.debug "Metadata extraction for #{entry.method} #{entry.path} encountered: #{e.message}"
-      end
-
-      # Apply any changes made by core blocks
-      entry.attribute_set.apply!
-    end
-
-    # Special context for boot-time metadata extraction
-    # Uses entry's AttributeSet directly (safe because boot-time is single-threaded)
-    class MetadataExtractionContext < RouteContext
-      def initialize(entry, request, params, receiver)
-        @entry = entry
-        @request = request
-        @params = params
-        @receiver = receiver
-        # Use entry's AttributeSet directly for boot-time extraction
-        # This is safe because metadata extraction runs once at boot time (single-threaded)
-        @core_attributes = @entry.attribute_set
-      end
-    end
-
-    # Mock request object used during metadata extraction
-    # Provides minimal interface to prevent errors when handlers are executed at boot time
-    class MetadataExtractionRequest
-      def to_response(*_args)
-        nil # Ignore response generation during metadata extraction
-      end
-
-      def method_missing(_name, *_args, &_block)
-        nil # Return nil for any method calls to prevent errors
-      end
-
-      def respond_to_missing?(_name, _include_private = false)
-        true # Pretend to respond to everything
-      end
+      @metadata_extractor.extract(entry)
     end
   end
 end

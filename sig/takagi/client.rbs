@@ -1,0 +1,119 @@
+module Takagi
+  # Unified Takagi Client for communicating with Takagi servers over CoAP.
+  #
+  # Supports multiple protocols (UDP, TCP) with automatic protocol detection
+  # based on URI scheme or explicit protocol parameter.
+  #
+  # @example Block-based with protocol auto-detection (recommended)
+  #   Takagi::Client.new('coap://localhost:5683') do |client|
+  #     client.get('/temperature')
+  #   end
+  #
+  # @example Block-based with explicit protocol
+  #   Takagi::Client.new('localhost:5683', protocol: :tcp) do |client|
+  #     client.get('/temperature')
+  #   end
+  #
+  # @example Manual lifecycle management
+  #   client = Takagi::Client.new('coap://localhost:5683')
+  #   begin
+  #     client.get('/temperature')
+  #   ensure
+  #     client.close
+  #   end
+  class Client < ClientBase
+    # Detect protocol from URI if not explicitly specified
+    @protocol: untyped
+
+    # Delegate to the appropriate client implementation
+    @impl: untyped
+
+    extend Forwardable
+
+    # Creates a new client and optionally yields it to a block.
+    #
+    # @param server_uri [String] URL of the Takagi server (e.g., 'coap://localhost:5683', 'localhost:5683')
+    # @param timeout [Integer] Maximum time to wait for a response
+    # @param protocol [Symbol, nil] Protocol to use (:udp, :tcp, or nil for auto-detection from URI)
+    # @param use_retransmission [Boolean] Enable RFC 7252 §4.2 compliant retransmission for UDP (default: true)
+    # @yield [client] Optionally yields the client to a block and auto-closes afterward
+    # @return [Client, Object] Returns the client instance, or the block's return value if a block is given
+    #
+    # @example Protocol auto-detection from URI
+    #   client = Takagi::Client.new('coap://localhost:5683')      # Uses UDP
+    #   client = Takagi::Client.new('coap+tcp://localhost:5683')  # Uses TCP
+    #
+    # @example Explicit protocol specification
+    #   client = Takagi::Client.new('localhost:5683', protocol: :tcp)
+    #   client = Takagi::Client.new('localhost:5683', protocol: :udp)
+    #
+    # @example With block (auto-close)
+    #   Takagi::Client.new('coap://localhost:5683') do |client|
+    #     client.get('/resource')
+    #   end
+    def initialize: (untyped server_uri, ?timeout: ::Integer, ?protocol: untyped?, ?use_retransmission: bool) ?{ (untyped) -> untyped } -> void
+
+    private
+
+    # Detects the protocol from the URI scheme
+    # @param uri_string [String] The URI to parse
+    # @return [Symbol] :tcp or :udp
+    def detect_protocol: (untyped uri_string) -> untyped
+
+    # Creates the appropriate client implementation based on protocol
+    # @param server_uri [String] Server URI
+    # @param timeout [Integer] Request timeout
+    # @param use_retransmission [Boolean] Enable retransmission for UDP
+    # @return [UdpClient, TcpClient] The client implementation
+    def create_client_impl: (untyped server_uri, untyped timeout, untyped use_retransmission) -> untyped
+
+    # Normalizes URI to include appropriate scheme
+    # @param uri_string [String] The URI string
+    # @return [String] Normalized URI with scheme
+    def normalize_uri: (untyped uri_string) -> (untyped | ::String)
+  end
+
+  # UDP-specific client implementation (internal)
+  # Users should use Takagi::Client with protocol: :udp instead
+  class UdpClient < ClientBase
+    @use_retransmission: untyped
+
+    @retransmission_manager: untyped
+
+    # Initializes the UDP client
+    # @param server_uri [String] URL of the Takagi server
+    # @param timeout [Integer] Maximum time to wait for a response
+    # @param use_retransmission [Boolean] Enable RFC 7252 §4.2 compliant retransmission (default: true)
+    def initialize: (untyped server_uri, ?timeout: ::Integer, ?use_retransmission: bool) -> void
+
+    # Stops the retransmission manager thread
+    def cleanup_resources: () -> untyped
+
+    private
+
+    # Executes a request to the server using Takagi::Message::Request
+    # @param method [Symbol] HTTP method (:get, :post, :put, :delete)
+    # @param path [String] Resource path
+    # @param payload [String] (optional) Data for POST/PUT requests
+    # @param callback [Proc] (optional) Callback function for processing the response
+    def request: (untyped method, untyped path, ?untyped? payload) { (?) -> untyped } -> untyped
+
+    # Simple request without retransmission (legacy mode)
+    def request_simple: (untyped message, untyped uri) { (?) -> untyped } -> untyped
+
+    # RFC 7252 §4.2 compliant request with automatic retransmission
+    def request_with_retransmission: (untyped message, untyped uri) { (?) -> untyped } -> untyped
+
+    def send_with_retransmission: (untyped message, untyped socket, untyped uri) -> untyped
+
+    def wait_for_response: (untyped message, untyped socket, untyped state) -> untyped
+
+    def check_socket_for_response: (untyped message, untyped socket, untyped state) -> untyped
+
+    def update_state: (untyped state, untyped response_data, untyped error) -> untyped
+
+    def handle_response_state: (untyped state) { (?) -> untyped } -> untyped
+
+    def deliver_raw_response: (untyped response) ?{ (?) -> untyped } -> untyped
+  end
+end

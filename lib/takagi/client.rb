@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'socket'
+require 'forwardable'
 require_relative 'client_base'
 require_relative 'message/retransmission_manager'
 
@@ -28,6 +29,13 @@ module Takagi
   #     client.close
   #   end
   class Client < ClientBase
+    extend Forwardable
+
+    # Delegate public methods to the implementation
+    def_delegators :@impl, :server_uri, :timeout, :callbacks, :closed?
+    def_delegators :@impl, :get, :post, :put, :delete, :on
+    def_delegators :@impl, :get_json, :post_json, :put_json, :close
+
     # Creates a new client and optionally yields it to a block.
     #
     # @param server_uri [String] URL of the Takagi server (e.g., 'coap://localhost:5683', 'localhost:5683')
@@ -64,38 +72,6 @@ module Takagi
       ensure
         close
       end
-    end
-
-    # Delegate server_uri to implementation
-    def server_uri
-      @impl&.server_uri
-    end
-
-    # Delegate timeout to implementation
-    def timeout
-      @impl&.timeout
-    end
-
-    # Delegate callbacks to implementation
-    def callbacks
-      @impl&.callbacks
-    end
-
-    # Delegate public ClientBase methods to implementation
-    %i[get post put delete on get_json post_json put_json].each do |method|
-      define_method(method) do |*args, &block|
-        @impl.public_send(method, *args, &block)
-      end
-    end
-
-    # Override close to delegate to implementation
-    def close
-      @impl&.close
-    end
-
-    # Override closed? to delegate to implementation
-    def closed?
-      @impl&.closed? || false
     end
 
     private
@@ -193,18 +169,18 @@ module Takagi
     def request_simple(message, uri, &callback)
       socket = UDPSocket.new
       socket.send(message.to_bytes, 0, uri.host, uri.port || 5683)
-      response, = socket.recvfrom(1024)
-      socket.close
 
-      if callback
-        callback.call(response)
-      elsif @callbacks[:response]
-        @callbacks[:response].call(response)
-      else
-        puts response
+      unless socket.wait_readable(@timeout)
+        puts 'TakagiClient Error: Request timeout'
+        return
       end
+
+      response, = socket.recvfrom(1024)
+      deliver_raw_response(response, &callback)
     rescue StandardError => e
       puts "TakagiClient Error: #{e.message}"
+    ensure
+      socket&.close unless socket&.closed?
     end
 
     # RFC 7252 §4.2 compliant request with automatic retransmission
@@ -256,6 +232,16 @@ module Takagi
         puts "TakagiClient Error: #{state[:error]}"
       else
         puts 'TakagiClient Error: Request timeout'
+      end
+    end
+
+    def deliver_raw_response(response, &callback)
+      if callback
+        callback.call(response)
+      elsif @callbacks[:response]
+        @callbacks[:response].call(response)
+      else
+        puts response
       end
     end
   end

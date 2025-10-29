@@ -1,0 +1,9 @@
+module Takagi
+  # Let's do some initialization
+  class Initializer
+    # Runs the initialization logic (e.g., loading configurations, setting up databases)
+    def self.run!: () -> untyped
+
+    def self.load_initializers: () -> untyped
+  end
+end

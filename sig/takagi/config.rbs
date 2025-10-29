@@ -1,0 +1,134 @@
+module Takagi
+  # Stores runtime configuration loaded from YAML or manual overrides.
+  class Config
+    @custom: untyped
+
+    @server_name: untyped
+
+    @logger: untyped
+
+    @port: untyped
+
+    @bind_address: untyped
+
+    @auto_migrate: untyped
+
+    @threads: untyped
+
+    @processes: untyped
+
+    @protocols: untyped
+
+    @observability: untyped
+
+    @event_bus: untyped
+
+    @router: untyped
+
+    @middleware: untyped
+
+    Observability: untyped
+
+    EventBusConfig: untyped
+
+    RouterConfig: untyped
+
+    MiddlewareConfig: untyped
+
+    attr_accessor port: untyped
+
+    attr_accessor bind_address: untyped
+
+    attr_accessor logger: untyped
+
+    attr_accessor observability: untyped
+
+    attr_accessor auto_migrate: untyped
+
+    attr_accessor custom: untyped
+
+    attr_accessor processes: untyped
+
+    attr_accessor threads: untyped
+
+    attr_accessor protocols: untyped
+
+    attr_accessor server_name: untyped
+
+    attr_accessor event_bus: untyped
+
+    attr_accessor router: untyped
+
+    attr_accessor middleware: untyped
+
+    def initialize: () -> void
+
+    def []: (untyped key) -> untyped
+
+    def []=: (untyped key, untyped value) -> untyped
+
+    def method_missing: (untyped name, *untyped args) { (?) -> untyped } -> untyped
+
+    def respond_to_missing?: (untyped name, ?bool include_private) -> untyped
+
+    def load_file: (untyped path) -> untyped
+
+    private
+
+    def apply_basic_settings: (untyped data) -> untyped
+
+    def apply_logger: (untyped data) -> (nil | untyped)
+
+    def apply_observability: (untyped data) -> (nil | untyped)
+
+    def apply_event_bus: (untyped data) -> (nil | untyped)
+
+    def apply_router: (untyped data) -> (nil | untyped)
+
+    def apply_middleware: (untyped data) -> (nil | untyped)
+
+    def apply_custom_settings: (untyped data) -> untyped
+
+    def load_yaml: (untyped path) -> untyped
+
+    def resolve_logger_output: (untyped target) -> untyped
+
+    def resolve_logger_level: (untyped level) -> untyped
+
+    def set_server_defaults: () -> untyped
+
+    def set_observability_defaults: () -> untyped
+
+    def set_event_bus_defaults: () -> untyped
+
+    def set_router_defaults: () -> untyped
+
+    def set_middleware_defaults: () -> untyped
+
+    def assign_setting: (untyped data, untyped key) { (untyped) -> untyped } -> (nil | untyped)
+
+    def assign_processes: (untyped data) -> (nil | untyped)
+
+    def assign_protocols: (untyped protocols) -> (nil | untyped)
+
+    def assign_event_bus_core: (untyped event_bus_data) -> untyped
+
+    def assign_message_buffer_settings: (untyped event_bus_data) -> untyped
+
+    def assign_event_bus_setting: (untyped event_bus_data, untyped key) -> (nil | untyped)
+
+    # Parse middleware entry from YAML config
+    # Supports both simple strings and hash with options
+    #
+    # @example Simple string
+    #   "Logging"
+    #
+    # @example Hash with options
+    #   { name: "Caching", options: { ttl: 300 } }
+    def parse_middleware_entry: (untyped entry) -> untyped
+
+    # Default middleware stack
+    # Returns an array of middleware configurations
+    def default_middleware_stack: () -> ::Array[{ name: "Debugging", options: ::Hash[untyped, untyped] }]
+  end
+end

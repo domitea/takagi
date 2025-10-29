@@ -1,0 +1,13 @@
+module Takagi
+  module Middleware
+    class Caching
+      @cache: untyped
+
+      @mutex: untyped
+
+      def initialize: () -> void
+
+      def call: (untyped request) { (untyped) -> untyped } -> untyped
+    end
+  end
+end

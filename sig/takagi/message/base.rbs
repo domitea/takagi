@@ -1,0 +1,64 @@
+module Takagi
+  module Message
+    # Base class for message
+    class Base
+      @data: untyped
+
+      @logger: untyped
+
+      @version: untyped
+
+      @type: untyped
+
+      @code: untyped
+
+      @message_id: untyped
+
+      @token: untyped
+
+      @options: untyped
+
+      @payload: untyped
+
+      attr_reader version: untyped
+
+      attr_reader type: untyped
+
+      attr_reader token: untyped
+
+      attr_reader message_id: untyped
+
+      attr_reader payload: untyped
+
+      attr_reader options: untyped
+
+      attr_reader code: untyped
+
+      def initialize: (?untyped? data) -> void
+
+      # Convert CoAP code number to method name using registry
+      # @param code [Integer] CoAP code number
+      # @return [String] Method name (e.g., 'GET', 'OBSERVE')
+      def coap_code_to_method: (untyped code) -> ("OBSERVE" | untyped)
+
+      # Convert method name to CoAP code number using registry
+      # @param method [String, Symbol] Method name (e.g., 'GET', :post)
+      # @return [Integer] CoAP code number
+      def coap_method_to_code: (untyped method) -> untyped
+
+      private
+
+      def parse: (untyped data) -> untyped
+
+      def parse_options: (untyped bytes) -> untyped
+
+      def extract_payload: (untyped data) -> (nil | untyped)
+
+      def decode_extended_value: (untyped bytes, untyped position, untyped raw_value) -> untyped
+
+      def store_option: (untyped options, untyped option_number, untyped value) -> untyped
+
+      def coerce_option_value: (untyped value) -> untyped
+    end
+  end
+end

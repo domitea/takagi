@@ -1,0 +1,51 @@
+module Takagi
+  class Base < Router
+    # Manages server lifecycle operations: booting, running, and spawning servers.
+    #
+    # Extracted from Base class to follow Single Responsibility Principle.
+    # Handles configuration loading, server instantiation, and process management.
+    module ServerLifecycle
+      # Boots the application by loading configuration and running initializers
+      #
+      # @param config_path [String] Path to configuration file
+      def boot!: (?config_path: ::String) -> untyped
+
+      # Runs the server in the foreground (blocking)
+      #
+      # @param port [Integer, nil] Port to bind to (uses config if nil)
+      # @param config_path [String] Path to configuration file
+      # @param protocols [Array<Symbol>, nil] Protocols to enable (uses config if nil)
+      def run!: (?port: untyped?, ?config_path: ::String, ?protocols: untyped?) -> untyped
+
+      # Spawns servers in background threads
+      #
+      # @param port [Integer] Port to bind to
+      # @param protocols [Array<Symbol>, nil] Protocols to enable (uses config if nil)
+      # @return [Server, Multi] The spawned server instance
+      def spawn!: (?port: ::Integer, ?protocols: untyped?) -> untyped
+
+      private
+
+      # Builds server instances for the given protocols
+      #
+      # @param protocols [Array<Symbol>] Protocol identifiers
+      # @param port [Integer] Port to bind to
+      # @return [Array<Server>] Array of server instances
+      def build_servers: (untyped protocols, untyped port) -> untyped
+
+      # Instantiates a server for the given protocol using ServerRegistry
+      #
+      # @param protocol [Symbol] Protocol identifier (:udp, :tcp, etc.)
+      # @param port [Integer] Port to bind to
+      # @param threads [Integer] Number of worker threads
+      # @param processes [Integer] Number of worker processes (UDP only)
+      # @return [Server] Server instance
+      def instantiate_server: (untyped protocol, untyped port, threads: untyped, processes: untyped) -> untyped
+
+      # Runs servers (single or multi-protocol)
+      #
+      # @param servers [Array<Server>] Server instances to run
+      def run_servers: (untyped servers) -> untyped
+    end
+  end
+end

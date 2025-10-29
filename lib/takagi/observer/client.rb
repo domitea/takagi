@@ -53,6 +53,8 @@ module Takagi
         return unless inbound.token == @token
 
         payload = inbound.payload
+        payload = payload.split("\xFF", 2).last if payload&.include?("\xFF")
+        payload = payload&.dup&.force_encoding('UTF-8')
         Takagi.logger.info "Received notify: #{payload}"
         @on_notify&.call(payload, inbound)
       rescue IO::WaitReadable

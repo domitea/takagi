@@ -1,0 +1,146 @@
+module Takagi
+  module CBOR
+    # CBOR Encoder (RFC 8949)
+    #
+    # Encodes Ruby objects to CBOR binary format.
+    # Optimized for IoT/CoAP workloads with minimal footprint.
+    #
+    # Supported types:
+    # - Integers (signed/unsigned, up to 64-bit)
+    # - Floats (64-bit IEEE 754)
+    # - Strings (UTF-8)
+    # - Byte strings (binary data)
+    # - Arrays
+    # - Hashes (maps)
+    # - Booleans (true/false)
+    # - nil (null)
+    # - Time (timestamp, tag 1)
+    #
+    # @example Basic encoding
+    #   Encoder.encode({ temperature: 25.5, humidity: 60 })
+    #   # => "\xA2ktempera..." (CBOR bytes)
+    #
+    # @example Encoding with symbols
+    #   Encoder.encode({ temp: 25.5 })
+    #   # Symbols converted to strings
+    class Encoder
+      # CBOR Major Types (RFC 8949 §3)
+      MAJOR_TYPE_UNSIGNED_INT: 0
+
+      MAJOR_TYPE_NEGATIVE_INT: 1
+
+      MAJOR_TYPE_BYTE_STRING: 2
+
+      MAJOR_TYPE_TEXT_STRING: 3
+
+      MAJOR_TYPE_ARRAY: 4
+
+      MAJOR_TYPE_MAP: 5
+
+      MAJOR_TYPE_TAG: 6
+
+      MAJOR_TYPE_SIMPLE: 7
+
+      # Simple values (RFC 8949 §3.3)
+      SIMPLE_FALSE: 20
+
+      SIMPLE_TRUE: 21
+
+      SIMPLE_NULL: 22
+
+      SIMPLE_FLOAT64: 27
+
+      # Tag values (RFC 8949 §3.4)
+      TAG_EPOCH_TIMESTAMP: 1
+
+      # Maximum safe integer values
+      MAX_UINT8: 255
+
+      MAX_UINT16: 65535
+
+      MAX_UINT32: 4294967295
+
+      MAX_UINT64: 18446744073709551615
+
+      TYPE_HANDLERS: ::Hash[untyped, :encode_integer | :encode_float | :encode_string | :encode_array | :encode_map | :encode_simple | :encode_timestamp]
+
+      # Encode a Ruby object to CBOR bytes
+      #
+      # @param obj [Object] Ruby object to encode
+      # @return [String] CBOR-encoded binary string
+      # @raise [EncodeError] if object cannot be encoded
+      #
+      # @example
+      #   Encoder.encode(42)              # => "\x18\x2A"
+      #   Encoder.encode("hello")         # => "ehello"
+      #   Encoder.encode([1, 2, 3])       # => "\x83\x01\x02\x03"
+      #   Encoder.encode({ a: 1 })        # => "\xA1aa\x01"
+      def self.encode: (untyped obj) -> untyped
+
+      # Encode a Ruby object to CBOR bytes
+      #
+      # @param obj [Object] Ruby object to encode
+      # @return [String] CBOR-encoded binary string
+      # @raise [EncodeError] if object cannot be encoded
+      def encode: (untyped obj) -> untyped
+
+      private
+
+      def encode_value: (untyped obj) -> untyped
+
+      def handler_for: (untyped obj) -> (:encode_symbol | untyped)
+
+      def encode_symbol: (untyped symbol) -> untyped
+
+      # Encode integer (major type 0 or 1)
+      def encode_integer: (untyped int) -> untyped
+
+      # Encode unsigned integer (major type 0)
+      # RFC 8949 §3.1
+      def encode_unsigned_int: (untyped int) -> untyped
+
+      # Encode negative integer (major type 1)
+      # RFC 8949 §3.1: -1 - n
+      def encode_negative_int: (untyped int) -> untyped
+
+      # Encode float (major type 7, additional info 27)
+      # RFC 8949 §3.3: Always use 64-bit IEEE 754
+      def encode_float: (untyped float) -> untyped
+
+      # Encode UTF-8 string (major type 3)
+      # RFC 8949 §3.1
+      def encode_string: (untyped str) -> untyped
+
+      # Encode byte string (major type 2)
+      # RFC 8949 §3.1
+      def encode_byte_string: (untyped bytes) -> untyped
+
+      # Encode array (major type 4)
+      # RFC 8949 §3.1
+      def encode_array: (untyped arr) -> untyped
+
+      # Encode map/hash (major type 5)
+      # RFC 8949 §3.1
+      def encode_map: (untyped hash) -> untyped
+
+      # Encode simple values (major type 7)
+      # RFC 8949 §3.3
+      def encode_simple: (untyped obj) -> untyped
+
+      # Encode timestamp (tag 1, epoch seconds)
+      # RFC 8949 §3.4.2
+      def encode_timestamp: (untyped time) -> untyped
+
+      # Encode major type with length/value
+      # RFC 8949 §3: Additional Information encoding
+      #
+      # Additional info:
+      # 0-23:   Value directly in additional info
+      # 24:     1-byte uint8 follows
+      # 25:     2-byte uint16 follows
+      # 26:     4-byte uint32 follows
+      # 27:     8-byte uint64 follows
+      def encode_with_length: (untyped major_type, untyped length) -> untyped
+    end
+  end
+end

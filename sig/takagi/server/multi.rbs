@@ -1,0 +1,16 @@
+module Takagi
+  module Server
+    # Helper class to run multiple servers concurrently
+    class Multi
+      @servers: untyped
+
+      @threads: untyped
+
+      def initialize: (untyped servers) -> void
+
+      def run!: () -> untyped
+
+      def shutdown!: () -> untyped
+    end
+  end
+end

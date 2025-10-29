@@ -1,0 +1,86 @@
+module Takagi
+  class EventBus
+    # Thread-safe LRU cache with TTL (pure Ruby)
+    # Zero runtime dependencies
+    #
+    # Features:
+    # - Least Recently Used eviction when at capacity
+    # - Time-To-Live (TTL) based expiration
+    # - Thread-safe with Mutex
+    #
+    # @example
+    #   cache = LRUCache.new(max_size: 1000, ttl: 3600)
+    #   cache.set('key', 'value')
+    #   cache.get('key') # => 'value'
+    #   cache.size # => 1
+    class LRUCache
+      @max_size: untyped
+
+      @ttl: untyped
+
+      @cache: untyped
+
+      @access_order: untyped
+
+      @timestamps: untyped
+
+      @mutex: untyped
+
+      attr_reader max_size: untyped
+
+      attr_reader ttl: untyped
+
+      # Initialize LRU cache
+      # @param max_size [Integer] Maximum number of entries (default: 1000)
+      # @param ttl [Integer] Time-to-live in seconds (default: 3600)
+      def initialize: (?::Integer max_size, ?::Integer ttl) -> void
+
+      # Get value from cache
+      # @param key [Object] Cache key
+      # @return [Object, nil] Cached value or nil if not found/expired
+      def get: (untyped key) -> untyped
+
+      # Set value in cache
+      # @param key [Object] Cache key
+      # @param value [Object] Value to cache
+      def set: (untyped key, untyped value) -> untyped
+
+      # Delete entry from cache
+      # @param key [Object] Cache key
+      # @return [Object, nil] Deleted value or nil
+      def delete: (untyped key) -> untyped
+
+      # Clear all entries
+      def clear: () -> untyped
+
+      # Get number of entries in cache
+      # @return [Integer] Cache size
+      def size: () -> untyped
+
+      # Check if cache is empty
+      # @return [Boolean]
+      def empty?: () -> untyped
+
+      # Check if key exists in cache
+      # @param key [Object] Cache key
+      # @return [Boolean]
+      def key?: (untyped key) -> untyped
+
+      # Get all keys in cache
+      # @return [Array] Cache keys
+      def keys: () -> untyped
+
+      # Get cache statistics
+      # @return [Hash] Statistics
+      def stats: () -> untyped
+
+      private
+
+      # Remove expired entries based on TTL
+      def cleanup_expired: () -> untyped
+
+      # Evict least recently used entry
+      def evict_oldest: () -> (nil | untyped)
+    end
+  end
+end

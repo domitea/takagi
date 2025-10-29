@@ -1,0 +1,14 @@
+module Takagi
+  module Network
+    # Sends UDP responses over the shared socket configured at boot.
+    class UdpSender
+      @socket: untyped
+
+      include Singleton
+
+      def setup: (socket: untyped) -> untyped
+
+      def transmit: (untyped packet, untyped address, untyped port) -> untyped
+    end
+  end
+end

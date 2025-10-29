@@ -4,73 +4,52 @@ require 'rack'
 require 'socket'
 require 'json'
 require_relative 'server/multi'
+require_relative 'server_registry'
 
 module Takagi
-  # Base class that every Takagi based app should use
-  class Base < Takagi::Router
-    def self.boot!(config_path: 'config/takagi.yml')
-      Takagi.config.load_file(config_path) if File.exist?(config_path)
-      Takagi::Initializer.run!
-    end
+  # Base class that every Takagi based app should use.
+  #
+  # Provides a Sinatra-like DSL for building CoAP servers with support for:
+  # - Route registration (GET, POST, PUT, DELETE, OBSERVE)
+  # - Middleware stack
+  # - Reactor pattern for observables/observers
+  # - Multi-protocol servers (UDP, TCP)
+  #
+  # This class now follows Single Responsibility Principle by delegating
+  # specific concerns to focused modules:
+  # - ServerLifecycle: Boot, run, spawn operations
+  # - MiddlewareManagement: Middleware stack configuration
+  # - ReactorManagement: Observable/observer patterns
+  #
+  # @example Basic usage
+  #   class MyAPI < Takagi::Base
+  #     get '/temperature' do
+  #       { value: 25.5, unit: 'C' }
+  #     end
+  #   end
+  #
+  #   MyAPI.run!
+  class Base < Router
+    extend ServerLifecycle
+    extend MiddlewareManagement
+    extend ReactorManagement
 
-    def self.run!(port: nil, config_path: 'config/takagi.yml', protocols: nil)
-      boot!(config_path: config_path)
-      selected_port = port || Takagi.config.port
-      servers = build_servers(protocols || Takagi.config.protocols, selected_port)
-      run_servers(servers)
-    end
-
-    def self.spawn!(port: 5683, protocols: nil)
-      protos = if protocols
-                 Array(protocols)
-               else
-                 Takagi.config.protocols
-               end.map(&:to_sym)
-
-      servers = protos.map do |proto|
-        proto == :tcp ? Takagi::Server::Tcp.new(port: port) : Takagi::Server::Udp.new(port: port)
-      end
-
-      if servers.length == 1
-        Thread.new { servers.first.run! }
-        servers.first
-      else
-        multi = Takagi::Server::Multi.new(servers)
-        Thread.new { multi.run! }
-        multi
-      end
-    end
-
+    # Returns the global router instance
+    #
+    # @return [Router] Singleton router instance
     def self.router
       @router ||= Takagi::Router.instance
     end
 
-    # Registers a GET route in the global router
-    # @param path [String] The URL path
-    # @param block [Proc] The request handler
-    def self.get(path, metadata: {}, &block)
-      router.get(path, metadata: metadata, &block)
-    end
+    # Dynamically delegate route registration methods to router
+    # Generates: get, post, put, delete, fetch, etc. from CoAP::Method registry
+    CoAP::Method.all.each_value do |method_name|
+      method_string = method_name.split.first
+      method_symbol = method_string.downcase.to_sym
 
-    # Registers a POST route in the global router
-    # @param path [String] The URL path
-    # @param block [Proc] The request handler
-    def self.post(path, metadata: {}, &block)
-      router.post(path, metadata: metadata, &block)
-    end
-
-    # Registers a PUT route in the global router
-    # @param path [String] The URL path
-    # @param block [Proc] The request handler
-    def self.put(path, metadata: {}, &block)
-      router.put(path, metadata: metadata, &block)
-    end
-
-    # Registers a DELETE route in the global router
-    # @param path [String] The URL path
-    # @param block [Proc] The request handler
-    def self.delete(path, metadata: {}, &block)
-      router.delete(path, metadata: metadata, &block)
+      define_singleton_method(method_symbol) do |path, metadata: {}, &block|
+        router.public_send(method_symbol, path, metadata: metadata, &block)
+      end
     end
 
     # Registers an OBSERVE route in the global router (server-side)
@@ -87,33 +66,7 @@ module Takagi
       router.configure_core(method.to_s.upcase, path, &block)
     end
 
-    def self.call(request)
-      middleware_stack.call(request)
-    end
-
-    def self.middleware_stack
-      @middleware_stack ||= Takagi::MiddlewareStack.load_from_config('', router)
-    end
-
-    def self.use(middleware)
-      middleware_stack.use(middleware)
-    end
-
-    def self.reactor(&block)
-      reactor_instance = Takagi::Reactor.new
-      reactor_instance.instance_eval(&block)
-      Takagi::ReactorRegistry.register(reactor_instance)
-    end
-
-    def self.use_reactor(klass)
-      reactor_instance = klass.new
-      Takagi::ReactorRegistry.register(reactor_instance)
-    end
-
-    def self.start_reactors
-      Takagi::ReactorRegistry.start_all
-    end
-
+    # Default routes for basic functionality and RFC 6690 discovery
     get '/.well-known/core', metadata: {
       rt: 'core.discovery',
       if: 'core.rd',
@@ -129,42 +82,19 @@ module Takagi
       )
     end
 
-    get '/ping' do # basic route for simple checking
+    get '/ping' do
       { message: 'Pong' }
     end
 
-    post '/echo' do |req| # testing route for working server
+    post '/echo' do |req|
       body = JSON.parse(req.payload || '{}')
       { echo: body['message'] }
     rescue JSON::ParserError
       { error: 'Invalid JSON' }
     end
 
-    class << self
-      private
-
-      def build_servers(protocols, port)
-        threads = Takagi.config.threads
-        processes = Takagi.config.processes
-        Array(protocols).map(&:to_sym).map do |protocol|
-          instantiate_server(protocol, port, threads: threads, processes: processes)
-        end
-      end
-
-      def instantiate_server(protocol, port, threads:, processes:)
-        case protocol
-        when :tcp
-          Takagi::Server::Tcp.new(port: port, worker_threads: threads)
-        else
-          Takagi::Server::Udp.new(port: port, worker_processes: processes, worker_threads: threads)
-        end
-      end
-
-      def run_servers(servers)
-        return servers.first.run! if servers.length == 1
-
-        Takagi::Server::Multi.new(servers).run!
-      end
-    end
+    # Register default server implementations
+    ServerRegistry.register(:udp, Takagi::Server::Udp, rfc: 'RFC 7252')
+    ServerRegistry.register(:tcp, Takagi::Server::Tcp, rfc: 'RFC 8323')
   end
 end
