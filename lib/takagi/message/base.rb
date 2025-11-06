@@ -6,8 +6,16 @@ module Takagi
     class Base
       attr_reader :version, :type, :token, :message_id, :payload, :options, :code
 
-      def initialize(data = nil)
-        parse(data) if data.is_a?(String) || data.is_a?(IO)
+      def initialize(data = nil, transport: :udp)
+        @transport = transport
+        if data.is_a?(String) || data.is_a?(IO)
+          case transport
+          when :tcp
+            parse_tcp(data)
+          else
+            parse(data)
+          end
+        end
         @data = data
         @logger = Takagi.logger
       end
@@ -33,6 +41,29 @@ module Takagi
       end
 
       private
+
+      # Parse TCP CoAP message (RFC 8323 §3.2)
+      # Format: Len+TKL (1 byte) | Code (1 byte) | Token (TKL bytes) | Options | Payload
+      def parse_tcp(data)
+        bytes = data.bytes
+        first_byte = bytes[0]
+
+        # First byte contains length nibble (upper 4 bits) and TKL (lower 4 bits)
+        # But the length nibble is only used for framing, not parsing the message itself
+        token_length = first_byte & 0b1111
+
+        @code = bytes[1]
+        @token = token_length.positive? ? bytes[2, token_length].pack('C*') : ''.b
+
+        # Parse options starting after code + token
+        @options = parse_options(bytes[(2 + token_length)..])
+        @payload = extract_payload(data)
+
+        # TCP CoAP doesn't have version, type, or message_id
+        @version = nil
+        @type = nil
+        @message_id = nil
+      end
 
       def parse(data)
         bytes = data.bytes

@@ -10,7 +10,7 @@ require_relative 'router/metadata_extractor'
 module Takagi
   class Router
     include Singleton
-    DEFAULT_CONTENT_FORMAT = 50
+    DEFAULT_CONTENT_FORMAT = Takagi::CoAP::Registries::ContentFormat::JSON
 
     # Represents a registered route with its handler and CoRE Link Format metadata
     class RouteEntry

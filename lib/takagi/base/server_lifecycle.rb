@@ -82,7 +82,7 @@ module Takagi
 
         # UDP requires worker_processes, TCP doesn't use it
         options[:worker_processes] = processes if protocol == :udp
-
+        Takagi.logger.debug("Instantiating server for #{protocol} on port #{port} with #{options}")
         ServerRegistry.build(protocol, **options)
       end
 

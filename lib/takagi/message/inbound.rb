@@ -6,8 +6,8 @@ module Takagi
     class Inbound < Base
       attr_reader :method, :uri, :response_code
 
-      def initialize(data)
-        super
+      def initialize(data, transport: :udp)
+        super(data, transport: transport)
         @method = coap_code_to_method(@code)
         @response_code = coap_code_to_method(@code) if @code >= CoAP::Response::CREATED # Response
         @uri = parse_coap_uri
@@ -16,13 +16,26 @@ module Takagi
       end
 
       def to_response(code, payload, options: {})
-        response_type = case @type
-                        when CoAP::MessageType::CON then CoAP::MessageType::ACK  # CON → ACK
-                        when CoAP::MessageType::NON then CoAP::MessageType::NON  # NON → NON
-                        else CoAP::MessageType::RST # fallback → RST
+        # For TCP transport, type is not used (RFC 8323)
+        response_type = if @transport == :tcp
+                          0  # No type field in TCP CoAP
+                        else
+                          case @type
+                          when CoAP::MessageType::CON then CoAP::MessageType::ACK  # CON → ACK
+                          when CoAP::MessageType::NON then CoAP::MessageType::NON  # NON → NON
+                          else CoAP::MessageType::RST # fallback → RST
+                          end
                         end
 
-        Outbound.new(code: code, payload: payload, token: @token, message_id: @message_id, type: response_type, options: options)
+        Outbound.new(
+          code: code,
+          payload: payload,
+          token: @token,
+          message_id: @message_id,
+          type: response_type,
+          options: options,
+          transport: @transport
+        )
       end
 
       def parse_coap_uri
