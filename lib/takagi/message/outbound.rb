@@ -141,11 +141,6 @@ module Takagi
       end
 
       def encode_option_value(value)
-        # Special handling for TCP signaling "empty" options
-        if @transport == :tcp && value.is_a?(Integer) && value.zero?
-          return "".b  # ← empty option (len=0)
-        end
-
         case value
         when Integer
           encode_integer_option_value(value)
@@ -155,10 +150,14 @@ module Takagi
       end
 
       def encode_integer_option_value(value)
-        return [value].pack('C') if value <= 0xFF
-        return [value].pack('n') if value <= 0xFFFF
+        return ''.b if value.zero?
 
-        [value].pack('N')
+        bytes = []
+        while value.positive?
+          bytes << (value & 0xFF)
+          value >>= 8
+        end
+        bytes.reverse.pack('C*')
       end
 
       def encode_option_header_value(value)

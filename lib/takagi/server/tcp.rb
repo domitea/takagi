@@ -65,8 +65,8 @@ module Takagi
       private
 
       def handle_connection(sock)
-        # RFC 8323: Exchange CSM (Capabilities and Settings Message) first
-        csm_sent = false
+        # RFC 8323 §5.3: Read client CSM first, then send server CSM
+        csm_received = false
 
         loop do
           inbound_request = read_request(sock)
@@ -74,23 +74,25 @@ module Takagi
 
           @logger.debug "Received request from client: #{inbound_request.inspect}"
 
-          # Handle CSM message (7.01) from client
-          if inbound_request.code == CoAP::Signaling::CSM
+          case inbound_request.code
+          when CoAP::Signaling::CSM
             @logger.debug "Received CSM from client"
-            unless csm_sent
+            unless csm_received
+              # Send our CSM in response to client's CSM
               send_csm(sock)
-              csm_sent = true
+              csm_received = true
             end
             next
+          when CoAP::Signaling::PING
+            @logger.debug "Received PING from client"
+            send_pong(sock, inbound_request)
+            next
+          when CoAP::Signaling::RELEASE, CoAP::Signaling::ABORT
+            @logger.debug "Received #{Takagi::CoAP::Registries::Signaling.name_for(inbound_request.code)} from client, closing connection"
+            break
           end
 
-          # RFC 8323 §5.1: Server should send CSM before processing first request
-          unless csm_sent
-            @logger.debug "Sending CSM to client before processing first request"
-            send_csm(sock)
-            csm_sent = true
-          end
-
+          # Process regular CoAP requests
           response = build_response(inbound_request)
           transmit_response(sock, response)
         end
@@ -137,34 +139,61 @@ module Takagi
                    len_nibble
                  when 13
                    ext = sock.read(1) or return
-                   ext.unpack1('C') + 13
+                   ext_value = ext.unpack1('C')
+                   @logger.debug "read_request: extended length byte=0x#{ext_value.to_s(16)}"
+                   ext_value + 13
                  when 14
                    ext = sock.read(2) or return
-                   ext.unpack1('n') + 269
+                   ext_value = ext.unpack1('n')
+                   @logger.debug "read_request: extended length bytes=0x#{ext_value.to_s(16)}"
+                   ext_value + 269
                  when 15
                    ext = sock.read(4) or return
-                   ext.unpack1('N') + 65_805
+                   ext_value = ext.unpack1('N')
+                   @logger.debug "read_request: extended length bytes=0x#{ext_value.to_s(16)}"
+                   ext_value + 65_805
                  end
 
-        @logger.debug "read_request: message length=#{length} bytes (tkl=#{tkl})"
+        @logger.debug "read_request: first_byte=0x#{first_byte.to_s(16)}, message length=#{length} bytes (tkl=#{tkl})"
 
-        # ✅ ČTI PŘESNĚ `length` BAJTŮ (už BEZ rámcového bajtu)
-        data = sock.read(length)
-        if data.nil? || data.bytesize != length
-          @logger.error "read_request: Incomplete message (expected #{length}, got #{data&.bytesize || 0})"
+        # RFC 8323 §3.3: Length field = size of (Options + Payload)
+        # We need to read: Code (1 byte) + Token (tkl bytes) + Options + Payload (length bytes)
+        code_size = 1
+        bytes_to_read = code_size + tkl + length
+        data = +''.b
+        remaining = bytes_to_read
+        while remaining.positive?
+          begin
+            chunk = sock.readpartial(remaining)
+          rescue IO::WaitReadable
+            IO.select([sock])
+            retry
+          rescue EOFError
+            @logger.error "read_request: Incomplete message (expected #{length}, got #{data.bytesize})"
+            return nil
+          end
+
+          @logger.debug "read_request: received chunk=#{chunk.bytes.map { |b| format('%02x', b) }.join}"
+          data << chunk
+          remaining -= chunk.bytesize
+        end
+
+        # Validate: must have space for at least Code byte
+        if bytes_to_read < 1
+          @logger.error "read_request: Invalid message size (<1)"
           return nil
         end
 
-        # ✅ Minimální validace: musí být prostor aspoň na Code
-        if length < 1
-          @logger.error "read_request: Invalid length (<1)"
-          return nil
-        end
+        bytes_remaining = sock.nread rescue 0
+        @logger.debug "read_request: Successfully read #{bytes_to_read} bytes (#{bytes_remaining} remain)"
 
-        @logger.debug "read_request: Successfully read #{length} bytes (#{sock.nread rescue 0} remain)"
+        # NOTE: With the corrected length calculation, the CSM workaround is no longer needed
+        # The bytes_remaining are likely from the next message in the TCP stream, not part of current message
 
-        # ✅ NEVRACEJ rámcový bajt do Inbound
-        Takagi::Message::Inbound.new(data, transport: :tcp)
+        packet = first_byte_data + data
+        @logger.debug "read_request: full packet=#{packet.bytes.map { |b| format('%02x', b) }.join}"
+
+        Takagi::Message::Inbound.new(packet, transport: :tcp)
       rescue IOError, Errno::ECONNRESET => e
         @logger.debug "read_request: Socket error (#{e.class}: #{e.message})"
         nil
@@ -194,42 +223,65 @@ module Takagi
         @logger.debug "Sent CSM to client (#{framed.bytesize} bytes, wrote #{written} bytes)"
       end
 
+      def send_pong(sock, request)
+        pong = Takagi::Message::Outbound.new(
+          code: CoAP::Signaling::PONG,
+          payload: '',
+          token: request.token,
+          message_id: 0,
+          type: 0,
+          options: {},
+          transport: :tcp
+        )
+
+        bytes = pong.to_bytes(transport: :tcp)
+        framed = encode_tcp_frame(bytes)
+        written = sock.write(framed)
+        sock.flush
+        @logger.debug "Sent PONG to client (#{framed.bytesize} bytes, wrote #{written} bytes)"
+      end
+
       # Encode TCP frame with RFC 8323 §3.3 variable-length encoding
       # The first byte of data has format: Len (upper 4 bits) | TKL (lower 4 bits)
       # We need to update the Len nibble and potentially add extension bytes
+      # NOTE: The Length field counts only Options + Payload, NOT Code or Token
       def encode_tcp_frame(data)
         return ''.b if data.empty?
 
         @logger.debug "encode_tcp_frame: input data (#{data.bytesize} bytes): #{data.inspect}"
 
         # Extract TKL from first byte
-        first_byte = data.bytes[0]
+        first_byte = data.getbyte(0)
         tkl = first_byte & 0x0F
-        length = data.bytesize
 
-        @logger.debug "encode_tcp_frame: first_byte=0x#{first_byte.to_s(16)}, tkl=#{tkl}, length=#{length}"
+        # RFC 8323 §3.3: Length = size of (Options + Payload)
+        # data structure: first_byte(1) + code(1) + token(tkl) + options + payload
+        # So: payload_length = total - 1 (first_byte) - 1 (code) - tkl (token)
+        code_size = 1
+        payload_length = [data.bytesize - 1 - code_size - tkl, 0].max
 
-        result = if length <= 12
-                   # Length fits in first nibble, update first byte
-                   new_first_byte = (length << 4) | tkl
-                   @logger.debug "encode_tcp_frame: new_first_byte=0x#{new_first_byte.to_s(16)}"
-                   [new_first_byte].pack('C') + data[1..]
-                 elsif length <= 268
-                   # Length nibble = 13, extension = 1 byte
-                   new_first_byte = (13 << 4) | tkl
-                   ext_byte = length - 13
-                   [new_first_byte, ext_byte].pack('CC') + data[1..]
-                 elsif length <= 65_804
-                   # Length nibble = 14, extension = 2 bytes
-                   new_first_byte = (14 << 4) | tkl
-                   ext_bytes = length - 269
-                   [new_first_byte].pack('C') + [ext_bytes].pack('n') + data[1..]
-                 else
-                   # Length nibble = 15, extension = 4 bytes
-                   new_first_byte = (15 << 4) | tkl
-                   ext_bytes = length - 65_805
-                   [new_first_byte].pack('C') + [ext_bytes].pack('N') + data[1..]
-                 end
+        @logger.debug "encode_tcp_frame: first_byte=0x#{first_byte.to_s(16)}, tkl=#{tkl}, payload_length=#{payload_length}"
+
+        body = data.byteslice(1, data.bytesize - 1) || ''.b
+
+        result =
+          if payload_length <= 12
+            new_first_byte = (payload_length << 4) | tkl
+            @logger.debug "encode_tcp_frame: new_first_byte=0x#{new_first_byte.to_s(16)}"
+            [new_first_byte].pack('C') + body
+          elsif payload_length <= 268
+            new_first_byte = (13 << 4) | tkl
+            extension = payload_length - 13
+            [new_first_byte, extension].pack('CC') + body
+          elsif payload_length <= 65_804
+            new_first_byte = (14 << 4) | tkl
+            extension = payload_length - 269
+            [new_first_byte].pack('C') + [extension].pack('n') + body
+          else
+            new_first_byte = (15 << 4) | tkl
+            extension = payload_length - 65_805
+            [new_first_byte].pack('C') + [extension].pack('N') + body
+          end
 
         @logger.debug "encode_tcp_frame: output (#{result.bytesize} bytes): #{result.inspect}"
         result
@@ -240,10 +292,10 @@ module Takagi
       def build_csm_message
         # CSM code is 7.01 (225)
         # Options: Max-Message-Size (2), Block-Wise-Transfer (4)
-        # Both are uint values, not packed binary
+        # Both are required for compatibility with coap-client-gnutls
         options = {
-          2 => 8_388_864,  # Max-Message-Size: 8MB (integer value, will be encoded properly)
-          4 => 0           # Block-Wise-Transfer supported (0 means supported)
+          2 => [8_388_864],  # Max-Message-Size: 8MB
+          4 => ['']          # Block-Wise-Transfer supported (empty string for zero-length option)
         }
         Takagi::Message::Outbound.new(
           code: CoAP::Signaling::CSM,
