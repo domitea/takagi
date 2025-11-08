@@ -12,13 +12,35 @@ module Takagi
         @type = type
         @options = normalize_options(options)
 
-        @payload = if payload.nil?
-                     nil
-                   elsif payload.is_a?(String)
-                     payload.b
-                   else
-                     payload.to_json.b
-                   end
+        # Serialize payload using content-format from options
+        @payload = serialize_payload(payload)
+      end
+
+      # Serialize payload based on content-format option
+      #
+      # @param payload [Object] Payload data to serialize
+      # @return [String, nil] Serialized binary payload
+      def serialize_payload(payload)
+        return nil if payload.nil?
+
+        # Already a string? Return as binary
+        return payload.b if payload.is_a?(String)
+
+        # Get content-format from options (default to JSON if not specified)
+        content_format = @options[CoAP::Option::CONTENT_FORMAT]
+        # Options are stored as arrays, extract first element
+        content_format = content_format.first if content_format.is_a?(Array)
+        content_format ||= CoAP::Registries::ContentFormat::JSON
+
+        # Use serialization system
+        Serialization::Registry.encode(payload, content_format)
+      rescue Serialization::UnknownFormatError
+        # Fallback to JSON for unknown formats
+        @logger.warn "Unknown content-format #{content_format}, falling back to JSON"
+        payload.to_json.b
+      rescue Serialization::EncodeError => e
+        @logger.error "Serialization failed: #{e.message}, falling back to JSON"
+        payload.to_json.b
       end
 
       def to_bytes(transport: nil)
