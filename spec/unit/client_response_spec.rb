@@ -92,7 +92,7 @@ RSpec.describe Takagi::Client::Response do
       json_payload = JSON.generate({ temperature: 25, humidity: 60 })
       response = described_class.new(mock_response(code: 69, payload: json_payload, content_format: 50))
 
-      json_data = response.json
+      json_data = response.data
       expect(json_data).to be_a(Hash)
       expect(json_data['temperature']).to eq(25)
       expect(json_data['humidity']).to eq(60)
@@ -100,7 +100,7 @@ RSpec.describe Takagi::Client::Response do
 
     it 'returns nil for invalid JSON' do
       response = described_class.new(mock_response(code: 69, payload: 'not json'))
-      expect(response.json).to be_nil
+      expect(response.data).to be_nil
     end
 
     it 'detects JSON content-format' do

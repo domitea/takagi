@@ -131,5 +131,22 @@ RSpec.describe Takagi::Message do
       expect(packet.bytesize).to be > 4
       expect(packet.force_encoding("ASCII-8BIT")).not_to include("\xFF".b)
     end
+
+    it "encodes integer options without leading zero bytes" do
+      message = Takagi::Message::Outbound.new(
+        code: Takagi::CoAP::Signaling::CSM,
+        payload: "",
+        token: "",
+        message_id: 0,
+        type: 0,
+        options: { 2 => 8_388_864 },
+        transport: :tcp
+      )
+
+      bytes = message.to_bytes(transport: :tcp)
+
+      expect(bytes.getbyte(2)).to eq(0x23) # delta=2, length=3
+      expect(bytes.byteslice(3, 3).bytes).to eq([0x80, 0x01, 0x00])
+    end
   end
 end

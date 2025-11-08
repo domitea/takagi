@@ -159,14 +159,33 @@ module Takagi
         @code == CoAP::Response::PROXYING_NOT_SUPPORTED
       end
 
-      # Parse payload as JSON
-      # @return [Hash, Array, nil] Parsed JSON or nil if parsing fails
-      def json
+      # Deserialize payload using content-format
+      #
+      # Automatically deserializes payload based on Content-Format option.
+      # Falls back to JSON for unknown formats or if deserialization fails.
+      #
+      # @return [Object, nil] Deserialized data or nil
+      #
+      # @example JSON response
+      #   response.data  # => { "temp" => 25 }
+      #
+      # @example CBOR response
+      #   response.data  # => { "temp" => 25 }
+      #
+      # @example Text response
+      #   response.data  # => "Hello World"
+      def data
         return nil unless @payload
 
-        JSON.parse(@payload)
-      rescue JSON::ParserError
-        nil
+        format = content_format || CoAP::Registries::ContentFormat::JSON
+
+        Serialization::Registry.decode(@payload, format)
+      rescue Serialization::UnknownFormatError
+        # Unknown format - try JSON as fallback
+        Serialization::Registry.decode(@payload, CoAP::Registries::ContentFormat::JSON)
+      rescue Serialization::DecodeError
+        # Decoding failed - return raw payload
+        @payload
       end
 
       # Check if response has JSON content-format

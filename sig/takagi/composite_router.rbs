@@ -1,0 +1,46 @@
+# Takagi::CompositeRouter - Routes requests to mounted controllers
+module Takagi
+  class CompositeRouter
+    # Represents a mounted controller
+    class MountedController < Struct[untyped]
+      attr_accessor controller_class: singleton(Controller)
+      attr_accessor mount_path: String
+      attr_accessor router: Router
+      attr_accessor nested_controllers: Array[singleton(Controller)]
+
+      # Check if this mount handles the given path
+      def handles?: (String path) -> bool
+
+      # Strip mount prefix from path
+      def relative_path: (String path) -> String
+    end
+
+    def initialize: () -> void
+
+    # Mount a controller at a path
+    def mount: (singleton(Controller) controller_class, ?at: String?) -> void
+
+    # Find a route handler
+    def find_route: (String method, String path) -> [Proc?, Hash[Symbol, String]]
+
+    # Get all routes from all controllers
+    def all_routes: () -> Array[String]
+
+    # Get link format entries from all controllers
+    def link_format_entries: () -> Array[Router::RouteEntry]
+
+    # Get all mounted controllers
+    def mounted_controllers: () -> Array[MountedController]
+
+    private
+
+    # Find the mounted controller for a path
+    def find_mounted_controller: (String path) -> MountedController?
+
+    # Recursively mount nested controllers
+    def mount_nested_controllers: (MountedController parent) -> void
+
+    attr_reader mounted: Array[MountedController]
+    attr_reader logger: Logger
+  end
+end

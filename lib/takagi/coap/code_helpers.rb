@@ -22,6 +22,9 @@ module Takagi
           # Try method registry first
           if code < 32
             Method.name_for(code) || numeric_to_string(code)
+          # Try signaling registry for 7.xx codes
+          elsif code >= 224
+            Signaling.name_for(code) || numeric_to_string(code)
           # Try response registry
           elsif code >= 64
             Response.name_for(code) || numeric_to_string(code)
@@ -62,7 +65,7 @@ module Takagi
         when Integer
           code
         when Symbol
-          Method.value_for(code) || Response.value_for(code) || 0
+          Method.value_for(code) || Response.value_for(code) || Signaling.value_for(code) || 0
         when String
           # Handle "2.05" or "2.05 Content" formats
           if code =~ /^(\d)\.(\d{2})/
@@ -161,6 +164,8 @@ module Takagi
           :method
         elsif code.between?(64, 191)
           :response
+        elsif code.between?(224, 255)
+          :signaling
         else
           :unknown
         end
@@ -171,7 +176,7 @@ module Takagi
       # @param code [Integer] Numeric code
       # @return [String, nil] RFC reference
       def self.find_rfc(code)
-        Method.rfc_for(code) || Response.rfc_for(code)
+        Method.rfc_for(code) || Response.rfc_for(code) || Signaling.rfc_for(code)
       end
 
       # Get all registered codes across all registries

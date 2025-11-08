@@ -1,0 +1,33 @@
+# Takagi::Profiles - Load profiles for IoT/CoAP use cases
+module Takagi
+  module Profiles
+    # Profile configuration hash
+    type profile_config = {
+      processes: Integer?,
+      threads: Integer?,
+      buffer_size: Integer?,
+      description: String
+    }
+
+    # All predefined profiles
+    PROFILES: Hash[Symbol, profile_config]
+
+    # Get a profile by name
+    def self.get: (Symbol name) -> profile_config?
+
+    # Check if profile exists
+    def self.exists?: (Symbol name) -> bool
+
+    # Get all available profile names
+    def self.available: () -> Array[Symbol]
+
+    # Get human-readable summary
+    def self.summary: () -> String
+
+    # Validate profile configuration
+    def self.validate!: (Symbol name, ?profile_config? config) -> void
+
+    # Apply profile with optional overrides
+    def self.apply: (Symbol name, ?Hash[Symbol, untyped] overrides) -> profile_config
+  end
+end

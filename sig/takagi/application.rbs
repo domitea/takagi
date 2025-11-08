@@ -1,0 +1,48 @@
+# Takagi::Application - Application management for modular apps
+module Takagi
+  class Application
+    # Application configuration hash
+    type config_hash = {
+      controllers: Array[singleton(Controller)],
+      auto_load_patterns: Array[String]
+    }
+
+    # Get the application's composite router
+    def self.router: () -> CompositeRouter
+
+    # Get the application's configuration
+    def self.config: () -> config_hash
+
+    # Configure the application
+    def self.configure: () { (ConfigContext) -> void } -> void
+
+    # Load and mount all registered controllers
+    def self.load_controllers!: () -> void
+
+    # Run the application server
+    def self.run!: (
+      ?port: Integer?,
+      ?config_path: String,
+      ?protocols: Array[Symbol]?
+    ) -> void
+
+    # Get all loaded controller classes
+    def self.controllers: () -> Array[singleton(Controller)]
+
+    private
+
+    # Auto-load controllers from file patterns
+    def self.auto_load_controllers!: () -> void
+
+    # Configuration DSL context
+    class ConfigContext
+      def initialize: (singleton(Application) app_class) -> void
+
+      # Load specific controller classes
+      def load_controllers: (*singleton(Controller) controllers) -> void
+
+      # Auto-load controllers from file pattern
+      def auto_load: (String pattern) -> void
+    end
+  end
+end

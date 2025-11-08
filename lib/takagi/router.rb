@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'singleton'
 require 'forwardable'
 require_relative 'core/attribute_set'
 require_relative 'helpers'
@@ -9,8 +8,24 @@ require_relative 'router/metadata_extractor'
 
 module Takagi
   class Router
-    include Singleton
-    DEFAULT_CONTENT_FORMAT = 50
+    DEFAULT_CONTENT_FORMAT = Takagi::CoAP::Registries::ContentFormat::JSON
+
+    class << self
+      # Global singleton instance for backward compatibility with Takagi::Base
+      # New code should create Router instances directly
+      #
+      # @return [Router] The global router instance
+      def instance
+        @instance ||= new
+      end
+
+      # Reset the global instance (primarily for testing)
+      #
+      # @return [void]
+      def reset!
+        @instance = nil
+      end
+    end
 
     # Represents a registered route with its handler and CoRE Link Format metadata
     class RouteEntry

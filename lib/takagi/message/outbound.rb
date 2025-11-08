@@ -4,29 +4,59 @@ module Takagi
   module Message
     # Class for outbound message that is coming from server
     class Outbound < Base
-      def initialize(code:, payload:, token: nil, message_id: nil, type: CoAP::MessageType::NON, options: {})
-        super
+      def initialize(code:, payload:, token: nil, message_id: nil, type: CoAP::MessageType::NON, options: {}, transport: :udp)
+        super(nil, transport: transport)  # Call Base.initialize with transport
         @code = coap_method_to_code(code)
         @token = token || ''.b
         @message_id = message_id || rand(0..0xFFFF)
         @type = type
         @options = normalize_options(options)
 
-        @payload = if payload.nil?
-                     nil
-                   elsif payload.is_a?(String)
-                     payload.b
-                   else
-                     payload.to_json.b
-                   end
+        # Serialize payload using content-format from options
+        @payload = serialize_payload(payload)
       end
 
-      def to_bytes
+      # Serialize payload based on content-format option
+      #
+      # @param payload [Object] Payload data to serialize
+      # @return [String, nil] Serialized binary payload
+      def serialize_payload(payload)
+        return nil if payload.nil?
+
+        # Already a string? Return as binary
+        return payload.b if payload.is_a?(String)
+
+        # Get content-format from options (default to JSON if not specified)
+        content_format = @options[CoAP::Option::CONTENT_FORMAT]
+        # Options are stored as arrays, extract first element
+        content_format = content_format.first if content_format.is_a?(Array)
+        content_format ||= CoAP::Registries::ContentFormat::JSON
+
+        # Use serialization system
+        Serialization::Registry.encode(payload, content_format)
+      rescue Serialization::UnknownFormatError
+        # Fallback to JSON for unknown formats
+        @logger.warn "Unknown content-format #{content_format}, falling back to JSON"
+        payload.to_json.b
+      rescue Serialization::EncodeError => e
+        @logger.error "Serialization failed: #{e.message}, falling back to JSON"
+        payload.to_json.b
+      end
+
+      def to_bytes(transport: nil)
         return ''.b unless @code
+
+        # Use provided transport or fall back to instance variable
+        actual_transport = transport || @transport
 
         with_error_handling do
           log_generation
-          packet = (build_header + token_bytes + build_options_section + build_payload_section).b
+          packet = case actual_transport
+                   when :tcp
+                     build_tcp_message
+                   else
+                     build_udp_message
+                   end
           log_final_packet(packet)
           packet
         end
@@ -44,6 +74,25 @@ module Takagi
       def log_generation
         @logger.debug "Generating CoAP packet for code #{@code}, payload #{@payload.inspect}, " \
                       "message_id #{@message_id}, token #{@token.inspect}, type #{@type}"
+      end
+
+      # Build UDP CoAP message (RFC 7252)
+      def build_udp_message
+        (build_header + token_bytes + build_options_section + build_payload_section).b
+      end
+
+      # Build TCP CoAP message (RFC 8323 §3.2)
+      # Format: Len+TKL (1 byte) | Code (1 byte) | Token (TKL bytes) | Options | Payload
+      # Note: The Len nibble is calculated by the caller (encode_tcp_frame)
+      def build_tcp_message
+        token_length = @token.bytesize
+        # For TCP, we only set TKL in lower nibble; length nibble will be set during framing
+        first_byte = (0 << 4) | token_length  # Length nibble = 0 (placeholder)
+        packet = [first_byte, @code].pack('CC')
+        packet += token_bytes
+        packet += build_options_section
+        packet += build_payload_section
+        packet.b
       end
 
       def build_header
@@ -96,6 +145,8 @@ module Takagi
       def normalize_options(options)
         return {} unless options.is_a?(Hash)
 
+        @logger.debug "Packet options are: #{options.inspect}"
+
         options.each_with_object({}) do |(key, value), acc|
           numeric_key = Integer(key)
           values = Array(value)
@@ -121,10 +172,14 @@ module Takagi
       end
 
       def encode_integer_option_value(value)
-        return [value].pack('C') if value <= 0xFF
-        return [value].pack('n') if value <= 0xFFFF
+        return ''.b if value.zero?
 
-        [value].pack('N')
+        bytes = []
+        while value.positive?
+          bytes << (value & 0xFF)
+          value >>= 8
+        end
+        bytes.reverse.pack('C*')
       end
 
       def encode_option_header_value(value)

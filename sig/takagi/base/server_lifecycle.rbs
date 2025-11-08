@@ -15,7 +15,8 @@ module Takagi
       # @param port [Integer, nil] Port to bind to (uses config if nil)
       # @param config_path [String] Path to configuration file
       # @param protocols [Array<Symbol>, nil] Protocols to enable (uses config if nil)
-      def run!: (?port: untyped?, ?config_path: ::String, ?protocols: untyped?) -> untyped
+      # @param router [Router, CompositeRouter, nil] Custom router (uses global if nil)
+      def run!: (?port: untyped?, ?config_path: ::String, ?protocols: untyped?, ?router: (Router | CompositeRouter)?) -> untyped
 
       # Spawns servers in background threads
       #
@@ -30,8 +31,9 @@ module Takagi
       #
       # @param protocols [Array<Symbol>] Protocol identifiers
       # @param port [Integer] Port to bind to
+      # @param router [Router, CompositeRouter, nil] Custom router
       # @return [Array<Server>] Array of server instances
-      def build_servers: (untyped protocols, untyped port) -> untyped
+      def build_servers: (untyped protocols, untyped port, ?router: (Router | CompositeRouter)?) -> untyped
 
       # Instantiates a server for the given protocol using ServerRegistry
       #
@@ -39,8 +41,9 @@ module Takagi
       # @param port [Integer] Port to bind to
       # @param threads [Integer] Number of worker threads
       # @param processes [Integer] Number of worker processes (UDP only)
+      # @param router [Router, CompositeRouter, nil] Custom router
       # @return [Server] Server instance
-      def instantiate_server: (untyped protocol, untyped port, threads: untyped, processes: untyped) -> untyped
+      def instantiate_server: (untyped protocol, untyped port, threads: untyped, processes: untyped, ?router: (Router | CompositeRouter)?) -> untyped
 
       # Runs servers (single or multi-protocol)
       #

@@ -14,11 +14,16 @@ module Takagi
   #   bad_request('Invalid input')
   #   unauthorized({ error: 'Token expired' })
   module Helpers
-    # Returns a JSON response with 2.05 Content status
+    # Returns a JSON response with 2.05 Content status and sets Content-Format to application/json
+    # Similar to Sinatra's json helper, automatically sets the Content-Format option
     # @param data [Hash] The data to return as JSON
-    # @return [Hash] The data hash
+    # @return [Takagi::Message::Outbound] The response with JSON content-format
     def json(data = {})
-      data
+      request.to_response(
+        CoAP::Response.value_for(:content),
+        data,
+        options: { CoAP::Option::CONTENT_FORMAT => [Takagi::Router::DEFAULT_CONTENT_FORMAT] }
+      )
     end
 
     # Validates that required parameters are present
@@ -53,8 +58,10 @@ module Takagi
       # Determine if this is a success (2.xx) or error (4.xx, 5.xx) response
       if CoAP::Response.success?(code_number)
         # Success methods take optional data hash
-        define_method(method_name) do |data = {}|
-          request.to_response(code_string, data)
+        define_method(method_name) do |data = {}, options = {}|
+          options[CoAP::Option::CONTENT_FORMAT] ||= request.content_format
+          options[CoAP::Option::CONTENT_FORMAT] ||= Takagi::Router::DEFAULT_CONTENT_FORMAT
+          request.to_response(code_string, data, options: options)
         end
       else
         # Error methods take optional message (string or hash)
