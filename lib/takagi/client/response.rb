@@ -182,20 +182,10 @@ module Takagi
         Serialization::Registry.decode(@payload, format)
       rescue Serialization::UnknownFormatError
         # Unknown format - try JSON as fallback
-        json
+        Serialization::Registry.decode(@payload, CoAP::Registries::ContentFormat::JSON)
       rescue Serialization::DecodeError
         # Decoding failed - return raw payload
         @payload
-      end
-
-      # Parse payload as JSON
-      # @return [Hash, Array, nil] Parsed JSON or nil if parsing fails
-      def json
-        return nil unless @payload
-
-        JSON.parse(@payload)
-      rescue JSON::ParserError
-        nil
       end
 
       # Check if response has JSON content-format

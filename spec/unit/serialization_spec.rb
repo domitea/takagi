@@ -99,8 +99,8 @@ RSpec.describe Takagi::Serialization do
       expect(serializer.decode('')).to be_nil
     end
 
-    it 'raises DecodeError on invalid JSON' do
-      expect { serializer.decode('{invalid}') }.to raise_error(Takagi::Serialization::DecodeError)
+    it 'returns nil on invalid JSON' do
+      expect(serializer.decode('{invalid}')).to be_nil
     end
 
     it 'reports correct content type' do
@@ -313,12 +313,12 @@ RSpec.describe Takagi::Serialization do
       expect(data).to eq({ 'temp' => 25 })
     end
 
-    it 'returns raw payload on decode error' do
+    it 'returns nil on decode error' do
       raw_data = build_coap_response(code: 69, payload: '{invalid', content_format: 50)
       response = Takagi::Client::Response.new(raw_data)
 
       data = response.data
-      expect(data).to eq('{invalid')
+      expect(data).to be_nil
     end
   end
 

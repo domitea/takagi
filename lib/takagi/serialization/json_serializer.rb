@@ -53,20 +53,22 @@ module Takagi
       # Decode JSON bytes to Ruby object
       #
       # @param bytes [String] JSON bytes to decode
-      # @return [Object] Decoded Ruby object (Hash, Array, String, etc.)
-      # @raise [DecodeError] if decoding fails
+      # @return [Object, nil] Decoded Ruby object (Hash, Array, String, etc.) or nil if invalid
       #
       # @example Object decoding
       #   decode("{\"temp\":25}")  # => { "temp" => 25 }
       #
       # @example Array decoding
       #   decode("[1,2,3]")  # => [1, 2, 3]
+      #
+      # @example Invalid JSON
+      #   decode("{invalid}")  # => nil
       def decode(bytes)
         return nil if bytes.nil? || bytes.empty?
 
         JSON.parse(bytes)
       rescue JSON::ParserError => e
-        raise DecodeError, "JSON decoding failed: #{e.message}"
+        nil  # Return nil for invalid JSON
       end
 
       # MIME type for JSON
