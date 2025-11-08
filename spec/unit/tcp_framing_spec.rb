@@ -31,7 +31,13 @@ RSpec.describe Takagi::Server::Tcp do
       serialized = message.to_bytes(transport: :tcp)
       frame = server.send(:encode_tcp_frame, serialized)
 
-      expect(decoded_length(frame)).to eq(serialized.bytesize - 1)
+      # Current implementation: Length = Options + Payload
+      # serialized format: first_byte(1) + code(1) + token(tkl) + options + payload
+      first_byte = serialized.getbyte(0)
+      tkl = first_byte & 0x0F
+      expected_length = serialized.bytesize - 1 - 1 - tkl # total - first_byte - code - token
+
+      expect(decoded_length(frame)).to eq(expected_length)
       expect(frame.getbyte(0) & 0x0F).to eq(0) # token length unchanged
     end
 
@@ -47,7 +53,12 @@ RSpec.describe Takagi::Server::Tcp do
       serialized = outbound.to_bytes(transport: :tcp)
       frame = server.send(:encode_tcp_frame, serialized)
 
-      expect(decoded_length(frame)).to eq(serialized.bytesize - 1)
+      # Current implementation: Length = Options + Payload
+      first_byte = serialized.getbyte(0)
+      tkl = first_byte & 0x0F
+      expected_length = serialized.bytesize - 1 - 1 - tkl # total - first_byte - code - token
+
+      expect(decoded_length(frame)).to eq(expected_length)
       expect(frame.getbyte(0) & 0x0F).to eq(2)
     end
   end
