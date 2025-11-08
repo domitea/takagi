@@ -1,0 +1,73 @@
+# Takagi::Controller - Base class for modular controllers
+module Takagi
+  class Controller
+    # Controller configuration hash
+    type config_hash = {
+      mount_path: String?,
+      nested_from: singleton(Controller)?,
+      nested_controllers: Array[singleton(Controller)],
+      profile: Symbol?,
+      processes: Integer?,
+      threads: Integer?
+    }
+
+    # Get the controller's isolated router
+    def self.router: () -> Router
+
+    # Get the controller's configuration
+    def self.config: () -> config_hash
+
+    # Configure the controller
+    def self.configure: () { (ConfigContext) -> void } -> void
+
+    # Register a route
+    def self.add_route: (String method, String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+
+    # HTTP/CoAP method shortcuts (get, post, put, delete, etc.)
+    def self.get: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.post: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.put: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.delete: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.patch: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.fetch: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+    def self.ipatch: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+
+    # Observable route registration
+    def self.observable: (String path, ?metadata: Hash[Symbol, untyped]) { (Message::Inbound, Hash[Symbol, String]) -> untyped } -> void
+
+    # Get the full mount path
+    def self.mount_path: () -> String?
+
+    # Check if mounted
+    def self.mounted?: () -> bool
+
+    # Get nested controllers
+    def self.nested_controllers: () -> Array[singleton(Controller)]
+
+    # Get profile name
+    def self.profile_name: () -> Symbol?
+
+    # Get effective process count
+    def self.process_count: () -> Integer?
+
+    # Get effective thread count
+    def self.thread_count: () -> Integer?
+
+    # Configuration DSL context
+    class ConfigContext
+      def initialize: (singleton(Controller) controller_class) -> void
+
+      # Set mount path
+      def mount: (String path, ?nested_from: singleton(Controller)?) -> void
+
+      # Nest child controllers
+      def nest: (*singleton(Controller) controllers) -> void
+
+      # Set load profile
+      def profile: (Symbol name) -> void
+
+      # Set configuration value
+      def set: (Symbol key, untyped value) -> void
+    end
+  end
+end

@@ -1,0 +1,32 @@
+# Takagi::Serialization - Content-format serialization system
+module Takagi
+  module Serialization
+    # Custom error classes
+    class Error < StandardError
+    end
+
+    class UnknownFormatError < Error
+    end
+
+    class EncodeError < Error
+    end
+
+    class DecodeError < Error
+    end
+
+    class InvalidSerializerError < Error
+    end
+
+    # Register default serializers
+    def self.register_defaults!: () -> void
+
+    # Encode data with format
+    def self.encode: (untyped data, Integer format) -> String
+
+    # Decode bytes with format
+    def self.decode: (String bytes, Integer format) -> untyped
+
+    # Check if format is supported
+    def self.supports?: (Integer format) -> bool
+  end
+end

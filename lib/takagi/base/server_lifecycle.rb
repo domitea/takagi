@@ -20,10 +20,11 @@ module Takagi
       # @param port [Integer, nil] Port to bind to (uses config if nil)
       # @param config_path [String] Path to configuration file
       # @param protocols [Array<Symbol>, nil] Protocols to enable (uses config if nil)
-      def run!(port: nil, config_path: 'config/takagi.yml', protocols: nil)
+      # @param router [Router, CompositeRouter, nil] Custom router (uses global if nil)
+      def run!(port: nil, config_path: 'config/takagi.yml', protocols: nil, router: nil)
         boot!(config_path: config_path)
         selected_port = port || Takagi.config.port
-        servers = build_servers(protocols || Takagi.config.protocols, selected_port)
+        servers = build_servers(protocols || Takagi.config.protocols, selected_port, router: router)
         run_servers(servers)
       end
 
@@ -60,12 +61,13 @@ module Takagi
       #
       # @param protocols [Array<Symbol>] Protocol identifiers
       # @param port [Integer] Port to bind to
+      # @param router [Router, CompositeRouter, nil] Custom router (uses global if nil)
       # @return [Array<Server>] Array of server instances
-      def build_servers(protocols, port)
+      def build_servers(protocols, port, router: nil)
         threads = Takagi.config.threads
         processes = Takagi.config.processes
         Array(protocols).map(&:to_sym).map do |protocol|
-          instantiate_server(protocol, port, threads: threads, processes: processes)
+          instantiate_server(protocol, port, threads: threads, processes: processes, router: router)
         end
       end
 
@@ -75,10 +77,12 @@ module Takagi
       # @param port [Integer] Port to bind to
       # @param threads [Integer] Number of worker threads
       # @param processes [Integer] Number of worker processes (UDP only)
+      # @param router [Router, CompositeRouter, nil] Custom router (uses global if nil)
       # @return [Server] Server instance
-      def instantiate_server(protocol, port, threads:, processes:)
+      def instantiate_server(protocol, port, threads:, processes:, router: nil)
         options = { port: port }
         options[:worker_threads] = threads
+        options[:router] = router if router
 
         # UDP requires worker_processes, TCP doesn't use it
         options[:worker_processes] = processes if protocol == :udp

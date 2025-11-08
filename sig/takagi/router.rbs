@@ -10,9 +10,13 @@ module Takagi
 
     @metadata_extractor: untyped
 
-    include Singleton
-
     DEFAULT_CONTENT_FORMAT: 50
+
+    # Global singleton instance for backward compatibility
+    def self.instance: () -> Router
+
+    # Reset the global instance (for testing)
+    def self.reset!: () -> void
 
     # Represents a registered route with its handler and CoRE Link Format metadata
     class RouteEntry
