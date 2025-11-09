@@ -60,11 +60,14 @@ RSpec.describe Takagi::Reactor do
     uri = "coap://localhost:5683/sensors/temp"
     handler = proc { |_payload, _inbound| }
 
+    # Allow initialization logs, then expect the observe log
+    allow(Takagi.logger).to receive(:info)
     expect(Takagi.logger).to receive(:info).with("Observing remote resource: #{uri}")
     reactor.observe(uri, &handler)
 
-    expect(reactor.instance_variable_get(:@observes).size).to eq(1)
-    expect(reactor.instance_variable_get(:@observes).first[:uri]).to eq(uri)
+    # New reactor uses @observers hash instead of @observes array
+    expect(reactor.observers.size).to eq(1)
+    expect(reactor.observers[uri][:uri]).to eq(uri)
   end
 
   it 'notifies observer handlers when triggered' do

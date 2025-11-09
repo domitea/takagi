@@ -32,8 +32,8 @@ Gem::Specification.new do |spec|
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
   spec.files = gem_files
-  spec.bindir = 'exe'
-  spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  spec.bindir = 'bin'
+  spec.executables = ['takagi']
   spec.require_paths = ['lib']
 
   # Uncomment to register a new dependency of your gem

@@ -30,7 +30,7 @@ module Takagi
       def run!
         log_boot_details
         spawn_workers
-        Takagi::ReactorRegistry.start_all
+        Takagi::Observable::Registry.start_all
         @watcher.start
         trap('INT') { shutdown! }
 
@@ -48,7 +48,7 @@ module Takagi
         @watcher.stop
         close_socket
         terminate_workers
-        Takagi::ReactorRegistry.stop_all
+        Takagi::Observable::Registry.stop_all
 
         # Join the server thread if it was spawned
         if defined?(@server_thread) && @server_thread&.alive?

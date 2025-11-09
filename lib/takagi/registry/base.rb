@@ -65,7 +65,9 @@ module Takagi
 
         @mutex.synchronize do
           if registry.key?(key) && !overwrite
-            raise AlreadyRegisteredError, "#{key} is already registered"
+            # Enhanced error with suggestions
+            error = Errors::RegistryError.already_registered(self.class.name, key)
+            raise AlreadyRegisteredError, error.message
           end
 
           store_entry(key, value, **metadata)
@@ -84,7 +86,16 @@ module Takagi
       #   transport = MyRegistry.get(:udp)
       def get(key)
         value = self[key]
-        raise NotFoundError, "#{key} not found in registry" unless value
+        unless value
+          # Enhanced error with suggestions
+          available = keys
+          error = Errors::RegistryError.not_found(
+            self.class.name,
+            key,
+            available
+          )
+          raise NotFoundError, error.message
+        end
 
         value
       end

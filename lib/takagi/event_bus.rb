@@ -8,6 +8,7 @@ require_relative 'event_bus/future'
 require_relative 'event_bus/coap_bridge'
 require_relative 'event_bus/observer_cleanup'
 require_relative 'event_bus/message_buffer'
+require_relative 'event_bus/scope'
 
 module Takagi
   # High-level event distribution with threaded/process async delivery.
@@ -30,13 +31,14 @@ module Takagi
 
     # Event message wrapper (shareable for Ractor)
     class Message
-      attr_reader :address, :body, :headers, :reply_address, :timestamp
+      attr_reader :address, :body, :headers, :reply_address, :timestamp, :scope
 
-      def initialize(address, body, headers: {}, reply_address: nil)
+      def initialize(address, body, headers: {}, reply_address: nil, scope: Scope::DEFAULT)
         @address = address.freeze
         @body = deep_freeze(body)
         @headers = deep_freeze(headers)
         @reply_address = reply_address&.freeze
+        @scope = Scope.normalize(scope)
         @timestamp = Time.now
       end
 
@@ -144,12 +146,19 @@ module Takagi
       # @param address [String] Event address (e.g., "sensor.temperature.room1")
       # @param body [Object] Message body (must be shareable for Ractors)
       # @param headers [Hash] Optional message headers
+      # @param scope [Symbol] Message scope (:local, :cluster, :global) - defaults to :local
       # @return [Message] Published message
       #
-      # @example
-      #   EventBus.publish('sensor.temperature.room1', { value: 25.5, unit: 'C' })
-      def publish(address, body = nil, headers: {})
-        message = Message.new(address, body, headers: headers)
+      # @example Local event (default)
+      #   EventBus.publish('system.startup', { version: '1.0' })
+      #
+      # @example Cluster-wide event
+      #   EventBus.publish('cache.invalidate', { key: 'user:123' }, scope: :cluster)
+      #
+      # @example Global event (cluster + external)
+      #   EventBus.publish('sensor.temperature.room1', { value: 25.5 }, scope: :global)
+      def publish(address, body = nil, headers: {}, scope: Scope::DEFAULT)
+        message = Message.new(address, body, headers: headers, scope: scope)
 
         # Hook: Store message if buffering enabled
         @message_store&.store(address, message)
@@ -166,8 +175,22 @@ module Takagi
           end
         end
 
-        # Automatic CoAP distribution (if distributed address)
-        if distributed?(address)
+        # Scope-aware distribution
+        case message.scope
+        when Scope::CLUSTER, Scope::GLOBAL
+          # Cluster distribution via CoAP OBSERVE
+          # ClusterBridge.publish_to_cluster(address, message)
+          log_debug "Cluster distribution not yet implemented for scope: #{message.scope}"
+        end
+
+        # Global scope: external CoAP subscribers (via /.well-known/core)
+        if message.scope == Scope::GLOBAL
+          @current_states.set(address, message.body)
+          CoAPBridge.publish_to_observers(address, message)
+        end
+
+        # Legacy distributed? check (backward compatibility)
+        if distributed?(address) && message.scope == Scope::DEFAULT
           @current_states.set(address, message.body)
           CoAPBridge.publish_to_observers(address, message)
         end

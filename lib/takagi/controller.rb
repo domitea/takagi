@@ -36,6 +36,9 @@ module Takagi
   #     end
   #   end
   class Controller
+    # Include reactor management for inline reactor definitions
+    extend Base::ReactorManagement
+
     class << self
       # Get or create the controller's isolated router
       #
@@ -165,9 +168,15 @@ module Takagi
 
       # Get or create the controller's thread pool
       #
-      # @return [ThreadPool, nil] Thread pool instance or nil if not started
+      # Lazy initialization: creates pool on first access if not already started.
+      # This allows reactors to share the controller's pool automatically.
+      #
+      # @return [ThreadPool] Thread pool instance
       def thread_pool
-        @thread_pool
+        @thread_pool ||= begin
+          Takagi.logger.debug "Lazy-initializing thread pool for #{name}"
+          start_workers!
+        end
       end
 
       # Start the controller's worker thread pool
@@ -196,9 +205,12 @@ module Takagi
       # Schedule a job to run in the controller's thread pool
       #
       # @yield Block to execute in worker thread
-      # @raise [RuntimeError] if thread pool not started
+      # @raise [ThreadPoolError] if thread pool not started
       def schedule(&block)
-        raise "Thread pool not started for #{name}. Call start_workers! first" unless @thread_pool
+        unless @thread_pool
+          error = Errors::ThreadPoolError.not_started(name)
+          raise error
+        end
 
         @thread_pool.schedule(&block)
       end
@@ -265,9 +277,27 @@ module Takagi
       # @example
       #   profile :high_throughput
       def profile(name)
-        raise ArgumentError, "Unknown profile: #{name}" unless Profiles.exists?(name)
+        unless Profiles.exists?(name)
+          error = Errors::ConfigurationError.invalid_profile(name, Profiles.available)
+          raise ArgumentError, error.message
+        end
 
         @controller.config[:profile] = name
+      end
+
+      # Set the number of threads for this controller
+      #
+      # @param count [Integer] Number of threads
+      #
+      # @example
+      #   threads 8
+      def threads(count)
+        unless count.is_a?(Integer) && count.positive?
+          error = Errors::ValidationError.invalid_thread_count(count)
+          raise ArgumentError, error.message
+        end
+
+        @controller.config[:threads] = count
       end
 
       # Set a configuration value
