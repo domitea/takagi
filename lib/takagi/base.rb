@@ -5,6 +5,9 @@ require 'socket'
 require 'json'
 require_relative 'server/multi'
 require_relative 'server_registry'
+require_relative 'network/registry'
+require_relative 'network/udp'
+require_relative 'network/tcp'
 
 module Takagi
   # Base class that every Takagi based app should use.
@@ -96,5 +99,9 @@ module Takagi
     # Register default server implementations
     ServerRegistry.register(:udp, Takagi::Server::Udp, rfc: 'RFC 7252')
     ServerRegistry.register(:tcp, Takagi::Server::Tcp, rfc: 'RFC 8323')
+
+    # Register default transport implementations
+    Network::Registry.register(:udp, Network::Udp)
+    Network::Registry.register(:tcp, Network::Tcp)
   end
 end

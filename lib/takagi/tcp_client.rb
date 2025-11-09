@@ -60,18 +60,17 @@ module Takagi
       )
 
       socket = TCPSocket.new(uri.host, uri.port || 5683)
-      data = message.to_bytes(transport: :tcp)
-
-      # RFC 8323: CoAP over TCP uses variable-length framing
-      framed_data = encode_tcp_frame(data)
+      # NEW: to_bytes now returns fully framed data
+      framed_data = message.to_bytes(transport: :tcp)
       socket.write(framed_data)
 
-      # Read response with RFC 8323 framing
-      response = read_tcp_message(socket)
+      # NEW: Read response using transport framing module
+      response_data = Takagi::Network::Framing::Tcp.read_from_socket(socket)
 
       socket.close
 
-      deliver_response(response, &callback) if response
+      # deliver_response expects raw bytes, not decoded message
+      deliver_response(response_data, &callback) if response_data
     rescue StandardError => e
       puts "TakagiTcpClient Error: #{e.message}"
       puts e.backtrace.join("\n")
@@ -80,6 +79,7 @@ module Takagi
     private
 
     # Read TCP message with RFC 8323 §3.3 variable-length framing
+    # DEPRECATED: Use Network::Framing::Tcp.read_from_socket instead
     def read_tcp_message(socket)
       # Set read timeout to prevent indefinite blocking
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, [5, 0].pack('l_2'))
@@ -118,6 +118,7 @@ module Takagi
     end
 
     # Encode TCP frame - Length = size of (Options + Payload)
+    # DEPRECATED: Use Network::Framing::Tcp.encode instead
     def encode_tcp_frame(data)
       return ''.b if data.empty?
 
