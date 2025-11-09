@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative 'controller/thread_pool'
+require_relative 'controller/resource_allocator'
+
 module Takagi
   # Base class for modular controllers with isolated routers
   #
@@ -158,6 +161,53 @@ module Takagi
       # @return [Integer, nil] Number of threads
       def thread_count
         config[:threads] || profile_config[:threads]
+      end
+
+      # Get or create the controller's thread pool
+      #
+      # @return [ThreadPool, nil] Thread pool instance or nil if not started
+      def thread_pool
+        @thread_pool
+      end
+
+      # Start the controller's worker thread pool
+      #
+      # @param threads [Integer] Number of threads to allocate
+      # @param name [String] Pool name (defaults to controller class name)
+      # @return [ThreadPool] The started thread pool
+      def start_workers!(threads: nil, name: nil)
+        threads ||= thread_count || 4  # Default to 4 threads
+        name ||= self.name.split('::').last  # e.g., "IngressController"
+
+        @thread_pool = ThreadPool.new(size: threads, name: name)
+        Takagi.logger.info "Started worker pool for #{name} with #{threads} threads"
+        @thread_pool
+      end
+
+      # Shutdown the controller's worker thread pool
+      def shutdown_workers!
+        return unless @thread_pool
+
+        Takagi.logger.info "Shutting down worker pool for #{name}"
+        @thread_pool.shutdown
+        @thread_pool = nil
+      end
+
+      # Schedule a job to run in the controller's thread pool
+      #
+      # @yield Block to execute in worker thread
+      # @raise [RuntimeError] if thread pool not started
+      def schedule(&block)
+        raise "Thread pool not started for #{name}. Call start_workers! first" unless @thread_pool
+
+        @thread_pool.schedule(&block)
+      end
+
+      # Check if the controller's thread pool is running
+      #
+      # @return [Boolean] true if thread pool is active
+      def workers_running?
+        @thread_pool && !@thread_pool.shutdown?
       end
 
       private

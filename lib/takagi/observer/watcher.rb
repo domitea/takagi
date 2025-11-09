@@ -35,7 +35,8 @@ module Takagi
 
       def stop
         @running = false
-        @thread&.join
+        @thread&.wakeup if @thread&.alive?
+        @thread&.join(2) # Wait max 2 seconds
       end
     end
   end

@@ -60,6 +60,11 @@ module Takagi
         @shutdown_called = true
         @watcher.stop
         @server.close if @server && !@server.closed?
+
+        # Join the server thread if it was spawned
+        if defined?(@server_thread) && @server_thread&.alive?
+          @server_thread.join(5) # Wait up to 5 seconds
+        end
       end
 
       private
@@ -118,6 +123,9 @@ module Takagi
       end
 
       def build_response(inbound_request)
+        # TCP already runs each connection in its own thread, so we don't need
+        # to delegate to controller pools - just process synchronously.
+        # Controller pools are primarily for UDP where we have fixed worker threads.
         result = @middleware_stack.call(inbound_request)
         ResponseBuilder.build(inbound_request, result, logger: @logger)
       end

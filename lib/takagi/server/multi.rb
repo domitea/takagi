@@ -18,6 +18,11 @@ module Takagi
       def shutdown!
         @servers.each(&:shutdown!)
         @threads.each(&:join)
+
+        # Join the server thread if it was spawned via spawn!
+        if defined?(@server_thread) && @server_thread&.alive?
+          @server_thread.join(5) # Wait up to 5 seconds
+        end
       end
     end
   end

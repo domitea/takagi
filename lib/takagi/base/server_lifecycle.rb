@@ -46,11 +46,16 @@ module Takagi
         end
 
         if servers.length == 1
-          Thread.new { servers.first.run! }
-          servers.first
+          server = servers.first
+          thread = Thread.new { server.run! }
+          # Store thread reference on the server instance for cleanup
+          server.instance_variable_set(:@server_thread, thread)
+          server
         else
           multi = Takagi::Server::Multi.new(servers)
-          Thread.new { multi.run! }
+          thread = Thread.new { multi.run! }
+          # Store thread reference on the multi instance for cleanup
+          multi.instance_variable_set(:@server_thread, thread)
           multi
         end
       end
