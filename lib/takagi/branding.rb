@@ -15,7 +15,7 @@ module Takagi
 
         ╔═══════════════════════════════════╗
         ║                                   ║
-        ║         [#{WAVE}] T A K A G I         ║
+        ║         [#{WAVE}] T A K A G I     ║
         ║                                   ║
         ║    CoAP Framework for Ruby        ║
         ║                                   ║
