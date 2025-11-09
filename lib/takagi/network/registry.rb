@@ -3,12 +3,14 @@
 module Takagi
   module Network
     # Registry for transport implementations.
+    #
     # Provides discovery and factory methods for transports.
+    # Uses Registry::Base for thread-safe storage and consistent API.
     class Registry
-      class TransportNotFoundError < StandardError; end
+      extend Takagi::Registry::Base
 
-      @transports = {}
-      @mutex = Mutex.new
+      # Error raised when transport is not found
+      class TransportNotFoundError < Takagi::Registry::Base::NotFoundError; end
 
       class << self
         # Register a transport implementation
@@ -19,23 +21,8 @@ module Takagi
         # @example
         #   Registry.register(:udp, Network::Udp)
         #   Registry.register(:tcp, Network::Tcp)
-        def register(name, klass)
-          validate_transport!(klass)
-          @mutex.synchronize do
-            @transports[name.to_sym] = klass
-          end
-        end
-
-        # Get a transport by name
-        #
-        # @param name [Symbol] Transport identifier
-        # @return [Class] Transport class
-        # @raise [TransportNotFoundError] If transport not registered
-        def get(name)
-          transport = @transports[name.to_sym]
-          raise TransportNotFoundError, "Transport not found: #{name}" unless transport
-
-          transport
+        def register(name, klass, **metadata)
+          super(name.to_sym, klass, **metadata)
         end
 
         # Find transport for a URI scheme
@@ -46,7 +33,10 @@ module Takagi
         # @example
         #   Registry.for_scheme('coap+tcp') # => Network::Tcp
         def for_scheme(scheme)
-          @transports.values.find do |transport|
+          # Get snapshot of transports to avoid holding lock during iteration
+          snapshot = @mutex.synchronize { registry.values }
+
+          snapshot.find do |transport|
             transport.scheme == scheme || transport.additional_schemes.include?(scheme)
           end
         end
@@ -67,33 +57,13 @@ module Takagi
           transport
         end
 
-        # Get all registered transport names
-        #
-        # @return [Array<Symbol>] List of transport identifiers
-        def all
-          @transports.keys
-        end
-
-        # Check if a transport is registered
-        #
-        # @param name [Symbol] Transport identifier
-        # @return [Boolean]
-        def registered?(name)
-          @transports.key?(name.to_sym)
-        end
-
-        # Clear all registrations (for testing)
-        def clear!
-          @mutex.synchronize do
-            @transports.clear
-          end
-        end
-
         private
 
-        def validate_transport!(klass)
+        # Validate transport implements required interface
+        def validate_entry!(name, klass, **metadata)
           unless klass.respond_to?(:scheme) && klass.respond_to?(:default_port)
-            raise ArgumentError, "#{klass} must implement .scheme and .default_port"
+            raise Takagi::Registry::Base::ValidationError,
+                  "#{klass} must implement .scheme and .default_port"
           end
         end
       end

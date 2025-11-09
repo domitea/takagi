@@ -5,7 +5,7 @@ module Takagi
     # Registry for content-format serializers
     #
     # Manages serializer instances and provides encoding/decoding dispatch.
-    # Thread-safe singleton registry.
+    # Thread-safe singleton registry using Registry::Base.
     #
     # @example Register a custom serializer
     #   Takagi::Serialization::Registry.register(41, XmlSerializer)
@@ -16,8 +16,7 @@ module Takagi
     # @example Decode data
     #   data = Takagi::Serialization::Registry.decode(bytes, 50)  # JSON
     class Registry
-      @serializers = {}
-      @mutex = Mutex.new
+      extend Takagi::Registry::Base
 
       class << self
         # Register a serializer for a content-format code
@@ -25,21 +24,16 @@ module Takagi
         # @param code [Integer] CoAP content-format code (RFC 7252 §12.3)
         # @param serializer [Base, Class] Serializer instance or class
         # @return [void]
-        # @raise [InvalidSerializerError] if serializer doesn't implement Base interface
+        # @raise [ValidationError] if serializer doesn't implement Base interface
         #
         # @example Register with class
         #   Registry.register(50, JsonSerializer)
         #
         # @example Register with instance
         #   Registry.register(50, JsonSerializer.new)
-        def register(code, serializer)
-          @mutex.synchronize do
-            instance = instantiate_serializer(serializer)
-            validate_serializer!(instance)
-
-            @serializers[code] = instance
-            Takagi.logger.debug "Registered serializer for content-format #{code}: #{instance.content_type}"
-          end
+        def register(code, serializer, **metadata)
+          instance = instantiate_serializer(serializer)
+          super(code, instance, **metadata)
         end
 
         # Get serializer for content-format code
@@ -50,7 +44,7 @@ module Takagi
         # @example
         #   serializer = Registry.serializer_for(50)  # => JsonSerializer instance
         def serializer_for(code)
-          @serializers[code]
+          self[code]
         end
         alias for serializer_for # Alias for convenience (but use carefully as 'for' is a keyword)
 
@@ -96,16 +90,6 @@ module Takagi
           raise DecodeError, "Decoding failed for format #{code}: #{e.message}"
         end
 
-        # Get all registered formats
-        #
-        # @return [Hash<Integer, Base>] Map of code => serializer
-        #
-        # @example
-        #   Registry.all  # => { 50 => #<JsonSerializer>, 60 => #<CborSerializer> }
-        def all
-          @serializers.dup
-        end
-
         # Check if format is supported
         #
         # @param code [Integer] CoAP content-format code
@@ -115,7 +99,7 @@ module Takagi
         #   Registry.supports?(50)  # => true (JSON)
         #   Registry.supports?(999) # => false
         def supports?(code)
-          @serializers.key?(code)
+          registered?(code)
         end
 
         # Get list of supported content-format codes
@@ -125,30 +109,7 @@ module Takagi
         # @example
         #   Registry.supported_formats  # => [0, 40, 50, 60]
         def supported_formats
-          @serializers.keys.sort
-        end
-
-        # Unregister a serializer
-        #
-        # @param code [Integer] CoAP content-format code
-        # @return [Base, nil] Removed serializer or nil
-        #
-        # @example
-        #   Registry.unregister(50)  # Remove JSON serializer
-        def unregister(code)
-          @mutex.synchronize do
-            @serializers.delete(code)
-          end
-        end
-
-        # Reset registry (useful for testing)
-        #
-        # @return [void]
-        #
-        # @example
-        #   Registry.clear!  # Remove all serializers
-        def clear!
-          @mutex.synchronize { @serializers.clear }
+          keys.sort
         end
 
         # Get human-readable summary of registered formats
@@ -162,7 +123,9 @@ module Takagi
         #   #      60: application/cbor (Cbor)"
         def summary
           lines = ["Registered Serializers:"]
-          @serializers.sort.each do |code, serializer|
+          # Get snapshot to avoid holding lock during iteration
+          snapshot = @mutex.synchronize { registry.dup }
+          snapshot.sort.each do |code, serializer|
             lines << "  #{code}: #{serializer.content_type} (#{serializer.name})"
           end
           lines.join("\n")
@@ -179,10 +142,11 @@ module Takagi
           end
         end
 
-        # Validate that serializer implements required interface
-        def validate_serializer!(serializer)
+        # Hook called by Registry::Base to validate entries before registration
+        def validate_entry!(code, serializer, **metadata)
           unless serializer.is_a?(Base)
-            raise InvalidSerializerError, "Serializer must inherit from Takagi::Serialization::Base"
+            raise Takagi::Registry::Base::ValidationError,
+                  "Serializer must inherit from Takagi::Serialization::Base"
           end
 
           # Test that required methods are implemented
@@ -191,14 +155,22 @@ module Takagi
             begin
               serializer.public_send(method, *dummy_args_for(method))
             rescue NotImplementedError => e
-              raise InvalidSerializerError, "Serializer missing implementation: #{e.message}"
+              raise Takagi::Registry::Base::ValidationError,
+                    "Serializer missing implementation: #{e.message}"
             rescue ArgumentError
               # Method exists but has wrong arity - that's OK, we'll catch it at runtime
             end
           end
+        rescue Takagi::Registry::Base::ValidationError
+          raise
         rescue StandardError => e
-          # Ignore errors during validation - we're just checking if methods exist
+          # Ignore other errors during validation - we're just checking if methods exist
           nil
+        end
+
+        # Hook called after successful registration
+        def after_register(code, serializer, **metadata)
+          Takagi.logger.debug "Registered serializer for content-format #{code}: #{serializer.content_type}"
         end
 
         # Get dummy arguments for method testing

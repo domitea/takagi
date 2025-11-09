@@ -9,6 +9,7 @@ module Takagi
       # - Numeric value
       # - Human-readable name
       # - Symbol accessor (optional)
+      # - Thread-safe storage
       #
       # This allows plugins to extend the protocol without modifying core code.
       #
@@ -22,6 +23,11 @@ module Takagi
       #   MyRegistry.name_for(1)  # => "First Value"
       #   MyRegistry.all      # => {1 => "First Value", 2 => "Second Value"}
       class Base
+        def self.inherited(subclass)
+          super
+          subclass.instance_variable_set(:@mutex, Mutex.new)
+        end
+
         class << self
           # Register a new constant in the registry
           #
@@ -33,21 +39,23 @@ module Takagi
           # @example
           #   register(69, '2.05 Content', :content, rfc: 'RFC 7252 §5.9.1.4')
           def register(value, name, symbol = nil, rfc: nil)
-            registry[value] = {
-              name: name,
-              symbol: symbol,
-              rfc: rfc
-            }
+            @mutex.synchronize do
+              registry[value] = {
+                name: name,
+                symbol: symbol,
+                rfc: rfc
+              }
 
-            # Create constant if symbol provided
-            if symbol
-              const_name = symbol.to_s.upcase
-              const_set(const_name, value) unless const_defined?(const_name, false)
+              # Create constant if symbol provided
+              if symbol
+                const_name = symbol.to_s.upcase
+                const_set(const_name, value) unless const_defined?(const_name, false)
+              end
+
+              # Store reverse lookup
+              reverse_registry[name] = value if name
+              reverse_registry[symbol] = value if symbol
             end
-
-            # Store reverse lookup
-            reverse_registry[name] = value if name
-            reverse_registry[symbol] = value if symbol
           end
 
           # Get human-readable name for a value
@@ -55,7 +63,7 @@ module Takagi
           # @param value [Integer] The numeric value
           # @return [String, nil] The name, or nil if not found
           def name_for(value)
-            registry[value]&.dig(:name)
+            @mutex.synchronize { registry[value]&.dig(:name) }
           end
 
           # Get numeric value for a name or symbol
@@ -63,7 +71,7 @@ module Takagi
           # @param key [String, Symbol] The name or symbol
           # @return [Integer, nil] The value, or nil if not found
           def value_for(key)
-            reverse_registry[key]
+            @mutex.synchronize { reverse_registry[key] }
           end
 
           # Get RFC reference for a value
@@ -71,7 +79,7 @@ module Takagi
           # @param value [Integer] The numeric value
           # @return [String, nil] The RFC reference, or nil if not found
           def rfc_for(value)
-            registry[value]&.dig(:rfc)
+            @mutex.synchronize { registry[value]&.dig(:rfc) }
           end
 
           # Check if a value is registered
@@ -79,14 +87,14 @@ module Takagi
           # @param value [Integer] The value to check
           # @return [Boolean] true if registered
           def registered?(value)
-            registry.key?(value)
+            @mutex.synchronize { registry.key?(value) }
           end
 
           # Get all registered constants
           #
           # @return [Hash] Map of value => name
           def all
-            registry.transform_values { |info| info[:name] }
+            @mutex.synchronize { registry.transform_values { |info| info[:name] } }
           end
 
           # Iterate over registered values
@@ -96,14 +104,16 @@ module Takagi
           def each_value(&block)
             return enum_for(:each_value) unless block_given?
 
-            registry.each_key(&block)
+            # Get snapshot to avoid holding lock during iteration
+            snapshot = @mutex.synchronize { registry.keys.dup }
+            snapshot.each(&block)
           end
 
           # Get all registered values
           #
           # @return [Array<Integer>] Array of all values
           def values
-            registry.keys
+            @mutex.synchronize { registry.keys.dup }
           end
 
           # Get registry metadata for a value
@@ -111,16 +121,18 @@ module Takagi
           # @param value [Integer] The numeric value
           # @return [Hash, nil] Full metadata hash
           def metadata_for(value)
-            registry[value]
+            @mutex.synchronize { registry[value]&.dup }
           end
 
           # Clear all registrations (useful for testing)
           def clear!
-            registry.clear
-            reverse_registry.clear
-            # Remove constants (carefully)
-            constants(false).each do |const_name|
-              remove_const(const_name) if const_name =~ /^[A-Z_]+$/
+            @mutex.synchronize do
+              registry.clear
+              reverse_registry.clear
+              # Remove constants (carefully)
+              constants(false).each do |const_name|
+                remove_const(const_name) if const_name =~ /^[A-Z_]+$/
+              end
             end
           end
 

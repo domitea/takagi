@@ -97,8 +97,8 @@ module Takagi
     end
 
     # Register default server implementations
-    ServerRegistry.register(:udp, Takagi::Server::Udp, rfc: 'RFC 7252')
-    ServerRegistry.register(:tcp, Takagi::Server::Tcp, rfc: 'RFC 8323')
+    Server::Registry.register(:udp, Takagi::Server::Udp, rfc: 'RFC 7252')
+    Server::Registry.register(:tcp, Takagi::Server::Tcp, rfc: 'RFC 8323')
 
     # Register default transport implementations
     Network::Registry.register(:udp, Network::Udp)
