@@ -26,10 +26,13 @@ module Takagi
         @logger.info "Starting Takagi TCP server on port #{@port}"
         @workers = []
         @watcher.start
-        trap('INT') { shutdown! }
+
+        # Set flag instead of calling shutdown! directly from trap context
+        # This avoids "can't be called from trap context" errors with logger
+        trap('INT') { @shutdown_requested = true }
 
         loop do
-          break if @shutdown_called
+          break if @shutdown_called || @shutdown_requested
 
           begin
             @logger.debug "Waiting for client connection..."
@@ -51,6 +54,10 @@ module Takagi
             end
           end
         end
+
+        # Call shutdown if it was requested by signal
+        shutdown! if @shutdown_requested
+
         @logger.info "TCP server stopped"
       end
 

@@ -32,12 +32,18 @@ module Takagi
         spawn_workers
         Takagi::Observable::Registry.start_all
         @watcher.start
-        trap('INT') { shutdown! }
+
+        # Set flag instead of calling shutdown! directly from trap context
+        # This avoids "can't be called from trap context" errors with logger
+        trap('INT') { @shutdown_requested = true }
 
         # Wait for workers with periodic checks for shutdown
-        until @shutdown_called
+        until @shutdown_called || @shutdown_requested
           sleep 0.1
         end
+
+        # Call shutdown if it was requested by signal
+        shutdown! if @shutdown_requested
       end
 
       # Gracefully shuts down all workers
