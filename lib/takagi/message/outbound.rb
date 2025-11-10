@@ -51,18 +51,40 @@ module Takagi
 
         with_error_handling do
           log_generation
-          packet = case actual_transport
-                   when :tcp
-                     build_tcp_message
-                   else
-                     build_udp_message
-                   end
+
+          # NEW: Use transport registry for encoding
+          packet = encode_with_transport(actual_transport)
+
           log_final_packet(packet)
           packet
         end
       end
 
       private
+
+      # Encode message using transport registry
+      def encode_with_transport(transport_symbol)
+        transport_class = case transport_symbol
+                          when :tcp
+                            Takagi::Network::Registry.get(:tcp)
+                          when :udp
+                            Takagi::Network::Registry.get(:udp)
+                          else
+                            Takagi::Network::Registry.get(:udp) # Default to UDP
+                          end
+
+        transport_impl = transport_class.new
+        transport_impl.encode(self)
+      rescue Takagi::Network::Registry::TransportNotFoundError
+        # Fallback to legacy methods if transport not found
+        @logger.warn "Transport #{transport_symbol} not found in registry, using legacy encoding"
+        case transport_symbol
+        when :tcp
+          build_tcp_message
+        else
+          build_udp_message
+        end
+      end
 
       def with_error_handling
         yield
@@ -77,6 +99,7 @@ module Takagi
       end
 
       # Build UDP CoAP message (RFC 7252)
+      # DEPRECATED: Kept for backward compatibility. Use Network::Framing::Udp instead.
       def build_udp_message
         (build_header + token_bytes + build_options_section + build_payload_section).b
       end
@@ -84,6 +107,7 @@ module Takagi
       # Build TCP CoAP message (RFC 8323 §3.2)
       # Format: Len+TKL (1 byte) | Code (1 byte) | Token (TKL bytes) | Options | Payload
       # Note: The Len nibble is calculated by the caller (encode_tcp_frame)
+      # DEPRECATED: Kept for backward compatibility. Use Network::Framing::Tcp instead.
       def build_tcp_message
         token_length = @token.bytesize
         # For TCP, we only set TKL in lower nibble; length nibble will be set during framing

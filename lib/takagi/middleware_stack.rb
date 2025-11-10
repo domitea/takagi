@@ -24,7 +24,7 @@ module Takagi
   class MiddlewareStack
     include Singleton
 
-    attr_reader :middlewares
+    attr_reader :middlewares, :router
 
     def initialize
       @logger = Takagi.logger

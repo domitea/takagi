@@ -76,19 +76,28 @@ module Takagi
 
     private
 
-    # Detects the protocol from the URI scheme
+    # Detects the protocol from the URI scheme using transport registry
     # @param uri_string [String] The URI to parse
     # @return [Symbol] :tcp or :udp
     def detect_protocol(uri_string)
       uri = URI(uri_string.start_with?('coap') ? uri_string : "coap://#{uri_string}")
-      case uri.scheme
-      when 'coap+tcp', 'coaps+tcp'
-        :tcp
+
+      # NEW: Use transport registry to find transport for scheme
+      transport = Takagi::Network::Registry.for_scheme(uri.scheme)
+
+      if transport
+        # Map transport class to symbol
+        case transport.scheme
+        when 'coap+tcp', 'coaps+tcp'
+          :tcp
+        else
+          :udp
+        end
       else
-        :udp
+        :udp # Default to UDP if transport not found
       end
-    rescue URI::InvalidURIError
-      :udp # Default to UDP if URI parsing fails
+    rescue URI::InvalidURIError, Takagi::Network::Registry::TransportNotFoundError
+      :udp # Default to UDP if URI parsing fails or transport not found
     end
 
     # Creates the appropriate client implementation based on protocol

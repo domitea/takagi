@@ -5,6 +5,18 @@ require 'spec_helper'
 
 RSpec.describe 'Takagi RFC 6690 Resource Discovery' do
   before(:all) do
+    # Clear any observable resources registered by other tests (EventBus CoAP bridge)
+    if defined?(Takagi::EventBus::CoAPBridge)
+      Takagi::EventBus::CoAPBridge.clear
+
+      # Also remove the routes from the global router that were added by CoAPBridge
+      router = Takagi::Base.router
+      router.instance_variable_get(:@routes_mutex).synchronize do
+        routes_hash = router.instance_variable_get(:@routes)
+        routes_hash.delete_if { |key, _| key.start_with?('OBSERVE /events/') }
+      end
+    end
+
     @previous_server_name = Takagi.config.server_name
     Takagi.config.server_name = 'Takagi Testbed'
 

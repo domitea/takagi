@@ -10,6 +10,7 @@ module Takagi
       def initialize(socket:, middleware_stack:, **options)
         @socket = socket
         @middleware_stack = middleware_stack
+        @router = options.fetch(:router, nil)
         @sender = options.fetch(:sender)
         @logger = options.fetch(:logger)
         @port = options.fetch(:port)
@@ -18,6 +19,10 @@ module Takagi
       end
 
       def run
+        @shutdown = false
+        trap('TERM') { @shutdown = true }
+        trap('INT') { @shutdown = true }
+
         queue = Queue.new
         Array.new(@threads) { spawn_thread(queue) }
 
@@ -29,12 +34,16 @@ module Takagi
 
       def process_loop(queue)
         loop do
-          next unless @socket.wait_readable(1)
+          break if @shutdown
+
+          next unless @socket.wait_readable(0.1)
 
           queue << @socket.recvfrom(1024)
         end
-      rescue Interrupt
         @logger.debug "[Worker PID: #{Process.pid}] Shutting down..."
+        exit(0)
+      rescue Interrupt, SignalException
+        @logger.debug "[Worker PID: #{Process.pid}] Interrupted, shutting down..."
         exit(0)
       end
 
@@ -64,6 +73,34 @@ module Takagi
         immediate = immediate_response(inbound_request)
         return transmit(immediate, addr) if immediate
 
+        # Delegate to controller's thread pool if available
+        delegate_to_controller_pool(inbound_request, addr)
+      rescue StandardError => e
+        @logger.error "Handle_request failed: #{e.message}"
+      end
+
+      def delegate_to_controller_pool(inbound_request, addr)
+        # Find which controller handles this path
+        path = inbound_request.uri.path
+        controller_class = find_controller_for_path(path)
+
+        if controller_class&.workers_running?
+          # Delegate to controller's thread pool
+          @logger.debug "Delegating #{path} to #{controller_class.name} worker pool"
+          source_endpoint = "#{addr[3]}:#{addr[1]}"
+
+          controller_class.schedule do
+            process_request(inbound_request, addr, source_endpoint)
+          end
+        else
+          # No controller pool available - process synchronously (backward compatible)
+          @logger.debug "Processing #{path} synchronously (no controller pool)"
+          source_endpoint = "#{addr[3]}:#{addr[1]}"
+          process_request(inbound_request, addr, source_endpoint)
+        end
+      end
+
+      def process_request(inbound_request, addr, source_endpoint)
         result = @middleware_stack.call(inbound_request)
         log_middleware_result(result)
         response = build_response(inbound_request, result)
@@ -76,7 +113,15 @@ module Takagi
 
         transmit(response, addr)
       rescue StandardError => e
-        @logger.error "Handle_request failed: #{e.message}"
+        @logger.error "Process_request failed: #{e.message}"
+      end
+
+      def find_controller_for_path(path)
+        # If using a CompositeRouter, find the controller
+        # Otherwise return nil (backward compatible with single Router)
+        return nil unless @router&.respond_to?(:find_controller_for_path)
+
+        @router.find_controller_for_path(path)
       end
 
       def log_inbound_request(inbound_request)

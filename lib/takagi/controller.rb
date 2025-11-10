@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative 'controller/thread_pool'
+require_relative 'controller/resource_allocator'
+
 module Takagi
   # Base class for modular controllers with isolated routers
   #
@@ -33,6 +36,9 @@ module Takagi
   #     end
   #   end
   class Controller
+    # Include reactor management for inline reactor definitions
+    extend Base::ReactorManagement
+
     class << self
       # Get or create the controller's isolated router
       #
@@ -160,6 +166,62 @@ module Takagi
         config[:threads] || profile_config[:threads]
       end
 
+      # Get or create the controller's thread pool
+      #
+      # Lazy initialization: creates pool on first access if not already started.
+      # This allows reactors to share the controller's pool automatically.
+      #
+      # @return [ThreadPool] Thread pool instance
+      def thread_pool
+        @thread_pool ||= begin
+          Takagi.logger.debug "Lazy-initializing thread pool for #{name}"
+          start_workers!
+        end
+      end
+
+      # Start the controller's worker thread pool
+      #
+      # @param threads [Integer] Number of threads to allocate
+      # @param name [String] Pool name (defaults to controller class name)
+      # @return [ThreadPool] The started thread pool
+      def start_workers!(threads: nil, name: nil)
+        threads ||= thread_count || 4  # Default to 4 threads
+        name ||= self.name.split('::').last  # e.g., "IngressController"
+
+        @thread_pool = ThreadPool.new(size: threads, name: name)
+        Takagi.logger.info "Started worker pool for #{name} with #{threads} threads"
+        @thread_pool
+      end
+
+      # Shutdown the controller's worker thread pool
+      def shutdown_workers!
+        return unless @thread_pool
+
+        Takagi.logger.info "Shutting down worker pool for #{name}"
+        @thread_pool.shutdown
+        @thread_pool = nil
+      end
+
+      # Schedule a job to run in the controller's thread pool
+      #
+      # @yield Block to execute in worker thread
+      # @raise [ThreadPoolError] if thread pool not started
+      def schedule(&block)
+        unless @thread_pool
+          error = Errors::ThreadPoolError.not_started(name)
+          raise error
+        end
+
+        @thread_pool.schedule(&block)
+      end
+
+      # Check if the controller's thread pool is running
+      #
+      # @return [Boolean] true if thread pool is active
+      def workers_running?
+        @thread_pool && !@thread_pool.shutdown?
+      end
+
       private
 
       # Get the profile configuration
@@ -215,9 +277,27 @@ module Takagi
       # @example
       #   profile :high_throughput
       def profile(name)
-        raise ArgumentError, "Unknown profile: #{name}" unless Profiles.exists?(name)
+        unless Profiles.exists?(name)
+          error = Errors::ConfigurationError.invalid_profile(name, Profiles.available)
+          raise ArgumentError, error.message
+        end
 
         @controller.config[:profile] = name
+      end
+
+      # Set the number of threads for this controller
+      #
+      # @param count [Integer] Number of threads
+      #
+      # @example
+      #   threads 8
+      def threads(count)
+        unless count.is_a?(Integer) && count.positive?
+          error = Errors::ValidationError.invalid_thread_count(count)
+          raise ArgumentError, error.message
+        end
+
+        @controller.config[:threads] = count
       end
 
       # Set a configuration value

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../branding'
+
 module Takagi
   class Base < Router
     # Manages server lifecycle operations: booting, running, and spawning servers.
@@ -21,8 +23,19 @@ module Takagi
       # @param config_path [String] Path to configuration file
       # @param protocols [Array<Symbol>, nil] Protocols to enable (uses config if nil)
       # @param router [Router, CompositeRouter, nil] Custom router (uses global if nil)
-      def run!(port: nil, config_path: 'config/takagi.yml', protocols: nil, router: nil)
+      # @param banner [Boolean] Show startup banner (default: true)
+      def run!(port: nil, config_path: 'config/takagi.yml', protocols: nil, router: nil, banner: true)
         boot!(config_path: config_path)
+
+        # Show startup banner
+        if banner
+          print_startup_banner(
+            port: port || Takagi.config.port,
+            protocols: protocols || Takagi.config.protocols,
+            router: router || self.router  # Pass router to banner
+          )
+        end
+
         selected_port = port || Takagi.config.port
         servers = build_servers(protocols || Takagi.config.protocols, selected_port, router: router)
         run_servers(servers)
@@ -46,16 +59,55 @@ module Takagi
         end
 
         if servers.length == 1
-          Thread.new { servers.first.run! }
-          servers.first
+          server = servers.first
+          thread = Thread.new { server.run! }
+          # Store thread reference on the server instance for cleanup
+          server.instance_variable_set(:@server_thread, thread)
+          server
         else
           multi = Takagi::Server::Multi.new(servers)
-          Thread.new { multi.run! }
+          thread = Thread.new { multi.run! }
+          # Store thread reference on the multi instance for cleanup
+          multi.instance_variable_set(:@server_thread, thread)
           multi
         end
       end
 
       private
+
+      # Prints startup banner with Takagi branding
+      #
+      # @param port [Integer] Port server will bind to
+      # @param protocols [Array<Symbol>] Protocols being enabled
+      # @param router [Router] Router instance to count routes from
+      def print_startup_banner(port:, protocols:, router:)
+        # Print banner
+        Branding.print_banner(compact: false)
+
+        # Version info
+        version = defined?(Takagi::VERSION) ? Takagi::VERSION : '0.1.0'
+        Branding.print_version(version)
+
+        puts
+        puts Branding.section('Starting Server')
+
+        # Server info
+        puts Branding.log("Port: #{port}")
+        puts Branding.log("Protocols: #{protocols.map(&:to_s).map(&:upcase).join(', ')}")
+        puts Branding.log("Threads: #{Takagi.config.threads}")
+        puts Branding.log("Processes: #{Takagi.config.processes}") if Takagi.config.processes > 0
+
+        # Route count
+        route_count = router.instance_variable_get(:@routes)&.size || 0
+        puts Branding.log("Routes registered: #{route_count}")
+
+        puts
+        puts Branding.success('Server starting...')
+        puts Branding.info('Press Ctrl+C to shutdown')
+        puts
+        puts Branding::WAVE_LINE
+        puts
+      end
 
       # Builds server instances for the given protocols
       #
@@ -87,7 +139,7 @@ module Takagi
         # UDP requires worker_processes, TCP doesn't use it
         options[:worker_processes] = processes if protocol == :udp
         Takagi.logger.debug("Instantiating server for #{protocol} on port #{port} with #{options}")
-        ServerRegistry.build(protocol, **options)
+        Server::Registry.build(protocol, **options)
       end
 
       # Runs servers (single or multi-protocol)

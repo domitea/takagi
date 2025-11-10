@@ -132,6 +132,15 @@ module Takagi
       @mounted
     end
 
+    # Find the controller class that handles a given path
+    #
+    # @param path [String] Request path
+    # @return [Class, nil] Controller class or nil if no match
+    def find_controller_for_path(path)
+      mounted = find_mounted_controller(path)
+      mounted&.controller_class
+    end
+
     private
 
     # Find the mounted controller that handles a path

@@ -15,9 +15,10 @@ module Takagi
     )
     RouterConfig = Struct.new(:default_content_format, keyword_init: true)
     MiddlewareConfig = Struct.new(:enabled, :stack, keyword_init: true)
+    AllocationConfig = Struct.new(:mode, :total_threads, keyword_init: true)
 
     attr_accessor :port, :bind_address, :logger, :observability, :auto_migrate, :custom, :processes, :threads,
-                  :protocols, :server_name, :event_bus, :router, :middleware
+                  :protocols, :server_name, :event_bus, :router, :middleware, :allocation
 
     def initialize
       set_server_defaults
@@ -25,6 +26,7 @@ module Takagi
       set_event_bus_defaults
       set_router_defaults
       set_middleware_defaults
+      set_allocation_defaults
       @custom = {}
       @server_name = nil
     end
@@ -62,6 +64,7 @@ module Takagi
       apply_event_bus(data)
       apply_router(data)
       apply_middleware(data)
+      apply_allocation(data)
       apply_custom_settings(data)
     end
 
@@ -123,6 +126,23 @@ module Takagi
       @middleware.stack = middleware_data['stack'].map do |middleware_config|
         parse_middleware_entry(middleware_config)
       end
+    end
+
+    def apply_allocation(data)
+      allocation_data = data['allocation']
+      return unless allocation_data
+
+      # Set allocation mode (:manual or :automatic)
+      if allocation_data['mode']
+        mode = allocation_data['mode'].to_sym
+        unless [:manual, :automatic].include?(mode)
+          raise ArgumentError, "Invalid allocation mode: #{mode}. Use 'manual' or 'automatic'"
+        end
+        @allocation.mode = mode
+      end
+
+      # Set total threads for automatic mode
+      @allocation.total_threads = allocation_data['total_threads'] if allocation_data['total_threads']
     end
 
     def apply_custom_settings(data)
@@ -200,6 +220,13 @@ module Takagi
       @middleware = MiddlewareConfig.new(
         enabled: true,
         stack: default_middleware_stack
+      )
+    end
+
+    def set_allocation_defaults
+      @allocation = AllocationConfig.new(
+        mode: :automatic,
+        total_threads: nil
       )
     end
 
